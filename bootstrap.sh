@@ -147,12 +147,20 @@ phase1_validate() {
     elif [[ -n "${OCI_CLI_TENANCY:-}" ]]; then
         OCI_TENANCY="$OCI_CLI_TENANCY"
     else
-        # Get from config or API
+        # Get from config file
         OCI_TENANCY=$(grep '^tenancy' ~/.oci/config 2>/dev/null | head -1 | cut -d'=' -f2 | tr -d ' ')
-        if [[ -z "$OCI_TENANCY" ]]; then
-            # Fallback: get root compartment (tenancy) from a simple API call
-            OCI_TENANCY=$(oci iam compartment list --query 'data[?contains("compartment-id", `tenancy`)].id | [0]' --raw-output 2>/dev/null)
-        fi
+    fi
+
+    # If still empty, get from API (users are always in root/tenancy compartment)
+    if [[ -z "$OCI_TENANCY" ]]; then
+        log_info "Detecting tenancy from API..."
+        OCI_TENANCY=$(oci iam user list --limit 1 --query 'data[0]."compartment-id"' --raw-output 2>/dev/null)
+    fi
+
+    if [[ -z "$OCI_TENANCY" ]]; then
+        log_error "Could not determine tenancy OCID"
+        log_info "Try setting: export OCI_TENANCY=ocid1.tenancy.oc1..your-tenancy-id"
+        exit 1
     fi
 
     log_info "Tenancy: ${OCI_TENANCY:0:50}..."
