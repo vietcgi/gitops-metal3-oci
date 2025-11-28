@@ -1,5 +1,5 @@
 terraform {
-  required_version = ">= 1.10.0"  # Nov 2025
+  required_version = ">= 1.5.0"  # Compatible with OCI Cloud Shell
 
   required_providers {
     oci = {
