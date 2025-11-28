@@ -220,14 +220,17 @@ phase2_free_tier() {
 
     log_info "Selected region: $OCI_REGION"
 
+    # Export region for OCI CLI commands
+    export OCI_CLI_REGION="$OCI_REGION"
+
     # Check if AMD free tier shape is available
     log_info "Checking free tier availability in $OCI_REGION..."
 
     # Get availability domains
-    ADS=$(oci iam availability-domain list --query 'data[*].name' --raw-output 2>/dev/null | jq -r '.[]')
+    ADS=$(oci iam availability-domain list --region "$OCI_REGION" --query 'data[*].name' --raw-output 2>/dev/null | jq -r '.[]')
 
     if [[ -z "$ADS" ]]; then
-        log_error "Could not list availability domains. Check your permissions."
+        log_error "Could not list availability domains in $OCI_REGION. Check your permissions or region subscription."
         exit 1
     fi
 
