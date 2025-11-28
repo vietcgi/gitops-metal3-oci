@@ -1,0 +1,107 @@
+#cloud-config
+#
+# Cloud-init configuration for Metal Foundry control plane
+# This runs on first boot to prepare the system
+#
+
+hostname: ${hostname}
+
+# Update and install basic packages
+package_update: true
+package_upgrade: true
+
+packages:
+  - curl
+  - wget
+  - git
+  - jq
+  - unzip
+  - apt-transport-https
+  - ca-certificates
+  - gnupg
+  - lsb-release
+  - iptables
+  - iptables-persistent
+  - open-iscsi
+  - nfs-common
+
+# Configure system settings
+write_files:
+  # Disable swap (required for Kubernetes)
+  - path: /etc/sysctl.d/99-kubernetes.conf
+    content: |
+      net.bridge.bridge-nf-call-iptables = 1
+      net.bridge.bridge-nf-call-ip6tables = 1
+      net.ipv4.ip_forward = 1
+      vm.swappiness = 0
+
+  # K3s configuration
+  - path: /etc/rancher/k3s/config.yaml
+    content: |
+      disable:
+        - flannel
+        - traefik
+        - servicelb
+        - local-storage
+      flannel-backend: none
+      disable-network-policy: true
+      write-kubeconfig-mode: "0644"
+      tls-san:
+        - "${hostname}"
+
+  # Marker file for bootstrap script
+  - path: /var/lib/cloud/scripts/per-once/99-ready-marker.sh
+    permissions: '0755'
+    content: |
+      #!/bin/bash
+      touch /var/lib/metal-foundry-ready
+
+runcmd:
+  # Disable swap
+  - swapoff -a
+  - sed -i '/swap/d' /etc/fstab
+
+  # Load kernel modules
+  - modprobe br_netfilter
+  - modprobe overlay
+  - echo "br_netfilter" >> /etc/modules-load.d/k8s.conf
+  - echo "overlay" >> /etc/modules-load.d/k8s.conf
+
+  # Apply sysctl settings
+  - sysctl --system
+
+  # Configure iptables for K3s and Cilium
+  # OCI security lists handle external filtering, these rules are for internal traffic
+  - iptables -A INPUT -i lo -j ACCEPT
+  - iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+  - iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+  - iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+  - iptables -A INPUT -p tcp --dport 443 -j ACCEPT
+  - iptables -A INPUT -p tcp --dport 6443 -j ACCEPT
+  - iptables -A INPUT -p tcp --dport 8080 -j ACCEPT
+  - iptables -A INPUT -p udp --dport 41641 -j ACCEPT
+  - iptables -A INPUT -p icmp -j ACCEPT
+  # Allow all pod/service traffic (Cilium manages this)
+  - iptables -A INPUT -s 10.0.0.0/8 -j ACCEPT
+  - iptables -A FORWARD -j ACCEPT
+  - netfilter-persistent save 2>/dev/null || true
+
+  # Start iscsid for potential storage needs
+  - systemctl enable iscsid
+  - systemctl start iscsid
+
+  # Install Tailscale (if auth key provided)
+%{ if tailscale_auth_key != "" }
+  - curl -fsSL https://tailscale.com/install.sh | sh
+  - tailscale up --auth-key="${tailscale_auth_key}" --hostname="${hostname}" --accept-routes
+%{ endif }
+
+  # Mark system as ready for K3s installation
+  # K3s and Cilium are installed by bootstrap.sh after cloud-init completes
+  - echo "Cloud-init complete. Ready for K3s installation." > /var/log/metal-foundry-init.log
+
+# Final message
+final_message: |
+  Metal Foundry control plane cloud-init complete!
+  System is ready for K3s + Cilium installation.
+  Elapsed time: $UPTIME seconds.

@@ -1,0 +1,59 @@
+# Ubuntu K3s Worker Workflow
+#
+# This workflow provisions a bare metal machine as a K3s worker node.
+# It references the hardware definition and template to install Ubuntu
+# and automatically join the K3s cluster.
+#
+# Usage:
+#   1. Create a Hardware definition for the machine
+#   2. Copy this workflow and update the hardware reference
+#   3. Apply to the cluster: kubectl apply -f workflow.yaml
+#   4. Boot the machine from iPXE
+#
+---
+apiVersion: tinkerbell.org/v1alpha1
+kind: Workflow
+metadata:
+  name: provision-worker-01
+  namespace: tink-system
+spec:
+  # Reference to the hardware definition
+  hardwareRef:
+    name: worker-01
+
+  # Reference to the template
+  templateRef:
+    name: ubuntu-24.04-k3s
+
+  # Template variables
+  templateParams:
+    # Device mapping (from hardware definition)
+    device_1: "{{.Hardware.Spec.Disks[0].Device}}"
+
+    # SSH public key for access
+    ssh_public_key: "ssh-ed25519 AAAA... your-key-here"
+
+    # Tailscale auth key for VPN
+    tailscale_auth_key: "tskey-auth-xxx"
+
+    # K3s cluster join information
+    k3s_url: "https://10.0.1.10:6443"
+    k3s_token: "K3S_TOKEN_HERE"
+---
+# Example: Second worker
+# apiVersion: tinkerbell.org/v1alpha1
+# kind: Workflow
+# metadata:
+#   name: provision-worker-02
+#   namespace: tink-system
+# spec:
+#   hardwareRef:
+#     name: worker-02
+#   templateRef:
+#     name: ubuntu-24.04-k3s
+#   templateParams:
+#     device_1: "/dev/sda"
+#     ssh_public_key: "ssh-ed25519 AAAA... your-key-here"
+#     tailscale_auth_key: "tskey-auth-xxx"
+#     k3s_url: "https://10.0.1.10:6443"
+#     k3s_token: "K3S_TOKEN_HERE"

@@ -1,0 +1,143 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+---
+# Prometheus + Grafana + Alertmanager Stack
+#
+# Full monitoring stack with:
+# - Prometheus (metrics collection)
+# - Grafana (dashboards)
+# - Alertmanager (alerting)
+# - Node Exporter (host metrics)
+# - Kube State Metrics (K8s metrics)
+#
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: kube-prometheus-stack
+  namespace: monitoring
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: kube-prometheus-stack
+      version: "72.6.2"  # Nov 2025 - stable
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community
+        namespace: flux-system
+  values:
+    # Prometheus
+    prometheus:
+      prometheusSpec:
+        retention: 15d
+        retentionSize: "10GB"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        # Storage for metrics
+        storageSpec:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: local-path
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 20Gi
+
+    # Grafana
+    grafana:
+      enabled: true
+      adminPassword: ""  # Auto-generated, get from secret
+      persistence:
+        enabled: true
+        storageClassName: local-path
+        size: 5Gi
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      # Default dashboards
+      defaultDashboardsEnabled: true
+      defaultDashboardsTimezone: utc
+
+    # Alertmanager
+    alertmanager:
+      alertmanagerSpec:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 32Mi
+          limits:
+            cpu: 100m
+            memory: 128Mi
+        storage:
+          volumeClaimTemplate:
+            spec:
+              storageClassName: local-path
+              accessModes: ["ReadWriteOnce"]
+              resources:
+                requests:
+                  storage: 1Gi
+
+    # Node Exporter (host metrics)
+    nodeExporter:
+      enabled: true
+      resources:
+        requests:
+          cpu: 10m
+          memory: 32Mi
+        limits:
+          cpu: 100m
+          memory: 64Mi
+
+    # Kube State Metrics
+    kubeStateMetrics:
+      enabled: true
+
+    # Disable components not needed for K3s
+    kubeEtcd:
+      enabled: false  # K3s uses embedded etcd
+    kubeControllerManager:
+      enabled: false  # K3s bundles this
+    kubeScheduler:
+      enabled: false  # K3s bundles this
+    kubeProxy:
+      enabled: false  # Using Cilium instead
+---
+# Ingress for Grafana
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: monitoring
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: cilium
+  rules:
+    # TODO: CHANGE THIS to your actual domain
+    - host: grafana.CHANGE_ME.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: kube-prometheus-stack-grafana
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        # TODO: CHANGE THIS to your actual domain
+        - grafana.CHANGE_ME.com
+      secretName: grafana-tls

@@ -1,0 +1,207 @@
+# Terraform CI/CD Pipeline
+#
+# This workflow runs on infrastructure changes and applies them via Terraform.
+# Uses OIDC for passwordless authentication to Oracle Cloud - NO STATIC SECRETS.
+#
+# How OIDC works:
+# 1. GitHub Actions requests a JWT from GitHub's OIDC provider
+# 2. The JWT contains claims about the repo, branch, and workflow
+# 3. OCI validates the JWT and grants temporary credentials
+# 4. Terraform uses these credentials to manage infrastructure
+#
+
+name: Terraform
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform.yaml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform.yaml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # Required for OIDC token request
+  contents: read
+  pull-requests: write
+
+env:
+  TF_VERSION: '1.10.0'  # Nov 2025 - matches versions.tf
+  TF_WORKING_DIR: 'terraform'
+  # OCI configuration - only non-sensitive values
+  OCI_CLI_TENANCY: ${{ vars.OCI_TENANCY }}
+  OCI_CLI_REGION: ${{ vars.OCI_REGION }}
+
+jobs:
+  # Validate Terraform configuration (no OCI auth needed)
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Init
+        run: terraform init -backend=false
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+  # Plan changes on PRs
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      # Get OIDC token from GitHub and exchange for OCI credentials
+      - name: Get GitHub OIDC Token
+        id: github-oidc
+        run: |
+          OIDC_TOKEN=$(curl -sLS "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=oci" \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            -H "Accept: application/json" | jq -r '.value')
+          echo "::add-mask::${OIDC_TOKEN}"
+          echo "token=${OIDC_TOKEN}" >> $GITHUB_OUTPUT
+
+      # Configure OCI CLI with OIDC token
+      - name: Configure OCI Credentials (OIDC)
+        run: |
+          mkdir -p ~/.oci
+          cat > ~/.oci/config << EOF
+          [DEFAULT]
+          tenancy=${{ vars.OCI_TENANCY }}
+          region=${{ vars.OCI_REGION }}
+          security_token_file=~/.oci/token
+          EOF
+          echo "${{ steps.github-oidc.outputs.token }}" > ~/.oci/token
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_tenancy_ocid: ${{ vars.OCI_TENANCY }}
+          TF_VAR_compartment_ocid: ${{ vars.OCI_COMPARTMENT }}
+          TF_VAR_region: ${{ vars.OCI_REGION }}
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan -no-color -out=tfplan 2>&1 | tee plan.txt
+          echo "plan<<EOF" >> $GITHUB_OUTPUT
+          head -c 60000 plan.txt >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_tenancy_ocid: ${{ vars.OCI_TENANCY }}
+          TF_VAR_compartment_ocid: ${{ vars.OCI_COMPARTMENT }}
+          TF_VAR_region: ${{ vars.OCI_REGION }}
+
+      - name: Comment Plan on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const plan = `${{ steps.plan.outputs.plan }}`;
+            const output = `## Terraform Plan
+
+            <details>
+            <summary>Show Plan</summary>
+
+            \`\`\`hcl
+            ${plan}
+            \`\`\`
+
+            </details>
+
+            *Pushed by: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+  # Apply changes on main branch
+  apply:
+    name: Apply
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      # Get OIDC token from GitHub and exchange for OCI credentials
+      - name: Get GitHub OIDC Token
+        id: github-oidc
+        run: |
+          OIDC_TOKEN=$(curl -sLS "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=oci" \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            -H "Accept: application/json" | jq -r '.value')
+          echo "::add-mask::${OIDC_TOKEN}"
+          echo "token=${OIDC_TOKEN}" >> $GITHUB_OUTPUT
+
+      # Configure OCI CLI with OIDC token
+      - name: Configure OCI Credentials (OIDC)
+        run: |
+          mkdir -p ~/.oci
+          cat > ~/.oci/config << EOF
+          [DEFAULT]
+          tenancy=${{ vars.OCI_TENANCY }}
+          region=${{ vars.OCI_REGION }}
+          security_token_file=~/.oci/token
+          EOF
+          echo "${{ steps.github-oidc.outputs.token }}" > ~/.oci/token
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_tenancy_ocid: ${{ vars.OCI_TENANCY }}
+          TF_VAR_compartment_ocid: ${{ vars.OCI_COMPARTMENT }}
+          TF_VAR_region: ${{ vars.OCI_REGION }}
+
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        env:
+          TF_VAR_tenancy_ocid: ${{ vars.OCI_TENANCY }}
+          TF_VAR_compartment_ocid: ${{ vars.OCI_COMPARTMENT }}
+          TF_VAR_region: ${{ vars.OCI_REGION }}
+
+      - name: Show Outputs
+        run: terraform output
+        working-directory: ${{ env.TF_WORKING_DIR }}

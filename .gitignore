@@ -1,0 +1,52 @@
+# Terraform
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+.terraform/
+.terraform.lock.hcl
+*.tfplan
+tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# OCI
+.oci-context
+
+# Kubernetes
+kubeconfig
+*.kubeconfig
+
+# Secrets (never commit!)
+*.pem
+*.key
+*secret*
+credentials*
+.env
+.env.*
+!.env.example
+
+# Build artifacts
+boot-media/build/
+boot-media/output/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+tmp/
+temp/

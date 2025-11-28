@@ -1,0 +1,2 @@
+# User applications go here
+# Flux will automatically deploy any Kustomization or HelmRelease in this directory

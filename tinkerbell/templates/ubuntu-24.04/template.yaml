@@ -1,0 +1,158 @@
+# Ubuntu 24.04 LTS Installation Template
+#
+# This template defines the actions to install Ubuntu 24.04 LTS on bare metal.
+# It uses Tinkerbell actions to partition disks, install the OS, and configure cloud-init.
+#
+---
+apiVersion: tinkerbell.org/v1alpha1
+kind: Template
+metadata:
+  name: ubuntu-24.04-k3s
+  namespace: tink-system
+spec:
+  data: |
+    version: "0.1"
+    name: ubuntu-24.04-k3s
+    global_timeout: 3600
+    tasks:
+      - name: "os-installation"
+        worker: "{{.device_1}}"
+        volumes:
+          - /dev:/dev
+          - /dev/console:/dev/console
+          - /lib/firmware:/lib/firmware:ro
+        actions:
+          # Step 1: Wipe disk
+          - name: "disk-wipe"
+            image: ghcr.io/tinkerbell/actions/disk-wipe:v1.0.1
+            timeout: 300
+            environment:
+              DEST_DISK: /dev/sda
+              CLEAR_PARTITIONS: "true"
+
+          # Step 2: Partition disk
+          - name: "disk-partition"
+            image: ghcr.io/tinkerbell/actions/disk-partition:v1.0.1
+            timeout: 300
+            environment:
+              DEST_DISK: /dev/sda
+              PARTITION_CONFIG: |
+                [
+                  {"label": "BIOS", "number": 1, "size": 1048576, "type": "ef02"},
+                  {"label": "EFI", "number": 2, "size": 536870912, "type": "ef00"},
+                  {"label": "BOOT", "number": 3, "size": 1073741824, "type": "8300"},
+                  {"label": "ROOT", "number": 4, "size": 0, "type": "8300"}
+                ]
+
+          # Step 3: Format partitions
+          - name: "format-efi"
+            image: ghcr.io/tinkerbell/actions/filesystem:v1.0.1
+            timeout: 60
+            environment:
+              DEST_DEVICE: /dev/sda2
+              FS_TYPE: vfat
+
+          - name: "format-boot"
+            image: ghcr.io/tinkerbell/actions/filesystem:v1.0.1
+            timeout: 60
+            environment:
+              DEST_DEVICE: /dev/sda3
+              FS_TYPE: ext4
+
+          - name: "format-root"
+            image: ghcr.io/tinkerbell/actions/filesystem:v1.0.1
+            timeout: 60
+            environment:
+              DEST_DEVICE: /dev/sda4
+              FS_TYPE: ext4
+
+          # Step 4: Mount partitions
+          - name: "mount-root"
+            image: ghcr.io/tinkerbell/actions/mount:v1.0.1
+            timeout: 60
+            environment:
+              DEVICE: /dev/sda4
+              MOUNTPOINT: /mnt
+
+          - name: "mount-boot"
+            image: ghcr.io/tinkerbell/actions/mount:v1.0.1
+            timeout: 60
+            environment:
+              DEVICE: /dev/sda3
+              MOUNTPOINT: /mnt/boot
+
+          - name: "mount-efi"
+            image: ghcr.io/tinkerbell/actions/mount:v1.0.1
+            timeout: 60
+            environment:
+              DEVICE: /dev/sda2
+              MOUNTPOINT: /mnt/boot/efi
+
+          # Step 5: Download and extract Ubuntu rootfs
+          - name: "stream-ubuntu"
+            image: ghcr.io/tinkerbell/actions/archive2disk:v1.0.1
+            timeout: 1800
+            environment:
+              ARCHIVE_URL: "https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64-root.tar.xz"
+              ARCHIVE_TYPE: "tar.xz"
+              DEST_DISK: /dev/sda4
+              DEST_PATH: /
+
+          # Step 6: Write cloud-init configuration
+          - name: "write-cloud-init"
+            image: ghcr.io/tinkerbell/actions/writefile:v1.0.1
+            timeout: 60
+            environment:
+              DEST_PATH: /mnt/etc/cloud/cloud.cfg.d/99-metal-foundry.cfg
+              CONTENTS: |
+                #cloud-config
+                hostname: {{.metadata.instance.hostname}}
+                manage_etc_hosts: true
+
+                users:
+                  - name: ubuntu
+                    sudo: ALL=(ALL) NOPASSWD:ALL
+                    shell: /bin/bash
+                    ssh_authorized_keys:
+                      - {{.ssh_public_key}}
+
+                package_update: true
+                packages:
+                  - curl
+                  - jq
+                  - open-iscsi
+
+                runcmd:
+                  # Disable swap
+                  - swapoff -a
+                  - sed -i '/swap/d' /etc/fstab
+
+                  # Install Tailscale
+                  - curl -fsSL https://tailscale.com/install.sh | sh
+                  - tailscale up --auth-key={{.tailscale_auth_key}} --hostname={{.metadata.instance.hostname}}
+
+                  # Install K3s agent
+                  - curl -sfL https://get.k3s.io | K3S_URL={{.k3s_url}} K3S_TOKEN={{.k3s_token}} sh -s - agent
+
+          # Step 7: Install bootloader
+          - name: "install-grub"
+            image: ghcr.io/tinkerbell/actions/grub-install:v1.0.1
+            timeout: 300
+            environment:
+              DEST_DISK: /dev/sda
+              BOOT_MODE: efi
+
+          # Step 8: Cleanup and reboot
+          - name: "cleanup"
+            image: ghcr.io/tinkerbell/actions/umount:v1.0.1
+            timeout: 60
+            environment:
+              MOUNTPOINT: /mnt
+
+          - name: "reboot"
+            image: ghcr.io/tinkerbell/actions/kexec:v1.0.1
+            timeout: 60
+            pid: host
+            environment:
+              BLOCK_DEVICE: /dev/sda
+              COMMAND_LINE: "console=tty0 console=ttyS0,115200n8"

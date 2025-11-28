@@ -1,0 +1,59 @@
+#!ipxe
+#
+# Metal Foundry iPXE Boot Script
+#
+# This script chainloads to your Tinkerbell server.
+# It's embedded into the USB/ISO image during build.
+#
+# The TINKERBELL_URL placeholder is replaced by the Makefile.
+#
+
+# Configuration
+set tinkerbell-url TINKERBELL_URL
+
+# Display banner
+echo
+echo ===============================================
+echo   Metal Foundry - Bare Metal Provisioning
+echo ===============================================
+echo
+echo Tinkerbell Server: ${tinkerbell-url}
+echo
+
+# Configure network
+echo Configuring network...
+:retry_dhcp
+dhcp || goto retry_dhcp
+echo IP Address: ${net0/ip}
+echo MAC Address: ${net0/mac}
+echo Gateway: ${net0/gateway}
+echo
+
+# Chain to Tinkerbell auto.ipxe endpoint
+echo Fetching boot configuration from Tinkerbell...
+chain ${tinkerbell-url}/auto.ipxe || goto failed
+
+:failed
+echo
+echo ===============================================
+echo   BOOT FAILED
+echo ===============================================
+echo
+echo Could not reach Tinkerbell server at:
+echo   ${tinkerbell-url}
+echo
+echo Possible causes:
+echo   1. Network configuration issue
+echo   2. Tinkerbell server is not running
+echo   3. Firewall blocking access
+echo   4. Hardware not registered in Tinkerbell
+echo
+echo Troubleshooting:
+echo   - Verify network connectivity
+echo   - Check Tinkerbell server status
+echo   - Ensure hardware MAC is registered
+echo
+echo Dropping to iPXE shell...
+echo Type 'exit' to reboot
+echo
+shell
