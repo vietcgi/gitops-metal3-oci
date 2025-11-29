@@ -30,12 +30,6 @@ spec:
         kind: HelmRepository
         name: tinkerbell
         namespace: flux-system
-  # Dynamic values from ConfigMap (created by setup script)
-  valuesFrom:
-    - kind: ConfigMap
-      name: cluster-info
-      valuesKey: tinkerbell-values.yaml
-      optional: false
   values:
     # Required: Pod CIDR for trusted proxies (K3s default)
     trustedProxies: "10.42.0.0/16"
@@ -75,10 +69,10 @@ spec:
           syslogEnabled: false
           isoEnabled: true
 
-    # Service configuration
+    # Service configuration (ClusterIP - traffic goes through ingress)
     service:
       enabled: true
-      type: LoadBalancer
+      type: ClusterIP
 
     # Hook files (HookOS artifacts)
     hookFiles:
