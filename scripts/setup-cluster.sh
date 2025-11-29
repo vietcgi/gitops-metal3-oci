@@ -376,13 +376,20 @@ spec:
 EOF
 log "CiliumL2AnnouncementPolicy created"
 
-# Create GatewayClass for Cilium Gateway API
-# This is required for Cilium to process Gateway resources
-# Wait for Gateway API CRDs to be available (installed by Cilium with gatewayAPI.enabled=true)
-log "Waiting for Gateway API CRDs to be available..."
-until kubectl get crd gatewayclasses.gateway.networking.k8s.io &>/dev/null; do
-    sleep 2
-done
+# Install Gateway API CRDs (required for Cilium Gateway API)
+# Cilium requires these CRDs to be pre-installed - it doesn't install them automatically
+log "Installing Gateway API CRDs..."
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.2.0/config/crd/standard/gateway.networking.k8s.io_gatewayclasses.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.2.0/config/crd/standard/gateway.networking.k8s.io_gateways.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.2.0/config/crd/standard/gateway.networking.k8s.io_httproutes.yaml
+kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.2.0/config/crd/standard/gateway.networking.k8s.io_referencegrants.yaml
+log "Gateway API CRDs installed"
+
+# Wait for CRDs to be established
+log "Waiting for Gateway API CRDs to be established..."
+kubectl wait --for condition=established --timeout=60s crd/gatewayclasses.gateway.networking.k8s.io
+kubectl wait --for condition=established --timeout=60s crd/gateways.gateway.networking.k8s.io
+kubectl wait --for condition=established --timeout=60s crd/httproutes.gateway.networking.k8s.io
 log "Gateway API CRDs are ready"
 
 log "Creating Cilium GatewayClass..."
