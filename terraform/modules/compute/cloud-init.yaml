@@ -76,7 +76,7 @@ write_files:
             log "Download successful"
             return 0
           fi
-          log "Download failed, waiting ${RETRY_DELAY}s before retry..."
+          log "Download failed, waiting $${RETRY_DELAY}s before retry..."
           sleep $RETRY_DELAY
           attempt=$((attempt + 1))
         done
