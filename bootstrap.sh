@@ -2,18 +2,17 @@
 #
 # GitOps Metal Foundry - Bootstrap Script
 #
-# Run from your local machine (Mac/Linux) with OCI CLI and GitHub CLI installed.
-# This script:
-#   1. Creates OCI API key for GitHub Actions
-#   2. Sets GitHub secrets via `gh` CLI (no manual steps!)
-#   3. Creates terraform.tfvars and pushes to repo
-#
-# Prerequisites:
-#   - OCI CLI configured: https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm
-#   - GitHub CLI authenticated: gh auth login
+# Run from your local machine (Mac/Linux). This script will:
+#   1. Install required tools (oci-cli, gh, jq) if missing
+#   2. Create OCI API key for GitHub Actions
+#   3. Set GitHub secrets via `gh` CLI (no manual steps!)
+#   4. Create terraform.tfvars and push to repo
 #
 # Usage:
 #   ./bootstrap.sh
+#
+# Or run directly:
+#   curl -sSL https://raw.githubusercontent.com/vietcgi/gitops-metal-foundry/main/bootstrap.sh | bash
 #
 
 set -euo pipefail
@@ -26,6 +25,10 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m'
+
+# Detect OS
+OS="$(uname -s)"
+ARCH="$(uname -m)"
 
 # Logging
 log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
@@ -72,50 +75,192 @@ EOF
 }
 
 #=============================================================================
-# Step 1: Validate Prerequisites
+# Step 1: Install Dependencies
 #=============================================================================
 
-validate_prerequisites() {
-    log_info "Validating prerequisites..."
+install_homebrew() {
+    if ! command -v brew &> /dev/null; then
+        log_info "Installing Homebrew..."
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-    # Check required tools
+        # Add to PATH for this session
+        if [[ "$OS" == "Darwin" ]]; then
+            eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
+        else
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+        fi
+    fi
+}
+
+install_dependencies() {
+    log_info "Checking dependencies..."
+
     local missing=()
-    for cmd in oci gh jq git openssl; do
+    for cmd in jq git openssl curl; do
         if ! command -v "$cmd" &> /dev/null; then
             missing+=("$cmd")
         fi
     done
 
-    if [[ ${#missing[@]} -gt 0 ]]; then
-        log_error "Missing required tools: ${missing[*]}"
-        echo ""
-        echo "Install with:"
-        echo "  brew install oci-cli gh jq git openssl"
-        exit 1
+    # Check for OCI CLI
+    if ! command -v oci &> /dev/null; then
+        missing+=("oci-cli")
     fi
-    log_success "All tools installed"
+
+    # Check for GitHub CLI
+    if ! command -v gh &> /dev/null; then
+        missing+=("gh")
+    fi
+
+    if [[ ${#missing[@]} -eq 0 ]]; then
+        log_success "All dependencies installed"
+        return
+    fi
+
+    log_info "Missing: ${missing[*]}"
+    log_info "Installing dependencies..."
+
+    case "$OS" in
+        Darwin)
+            # macOS - use Homebrew
+            install_homebrew
+
+            for pkg in "${missing[@]}"; do
+                case "$pkg" in
+                    oci-cli)
+                        log_info "Installing OCI CLI..."
+                        brew install oci-cli
+                        ;;
+                    gh)
+                        log_info "Installing GitHub CLI..."
+                        brew install gh
+                        ;;
+                    jq|git|openssl|curl)
+                        brew install "$pkg"
+                        ;;
+                esac
+            done
+            ;;
+        Linux)
+            # Linux - detect distro
+            if command -v apt-get &> /dev/null; then
+                # Debian/Ubuntu
+                sudo apt-get update -qq
+
+                for pkg in "${missing[@]}"; do
+                    case "$pkg" in
+                        oci-cli)
+                            log_info "Installing OCI CLI..."
+                            bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)" -- --accept-all-defaults
+                            export PATH="$HOME/bin:$PATH"
+                            ;;
+                        gh)
+                            log_info "Installing GitHub CLI..."
+                            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+                            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+                            sudo apt-get update -qq
+                            sudo apt-get install -y gh
+                            ;;
+                        jq|git|curl)
+                            sudo apt-get install -y "$pkg"
+                            ;;
+                        openssl)
+                            sudo apt-get install -y openssl
+                            ;;
+                    esac
+                done
+            elif command -v dnf &> /dev/null; then
+                # Fedora/RHEL
+                for pkg in "${missing[@]}"; do
+                    case "$pkg" in
+                        oci-cli)
+                            log_info "Installing OCI CLI..."
+                            bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)" -- --accept-all-defaults
+                            export PATH="$HOME/bin:$PATH"
+                            ;;
+                        gh)
+                            log_info "Installing GitHub CLI..."
+                            sudo dnf install -y 'dnf-command(config-manager)'
+                            sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+                            sudo dnf install -y gh
+                            ;;
+                        jq|git|curl|openssl)
+                            sudo dnf install -y "$pkg"
+                            ;;
+                    esac
+                done
+            elif command -v yum &> /dev/null; then
+                # CentOS/older RHEL
+                for pkg in "${missing[@]}"; do
+                    case "$pkg" in
+                        oci-cli)
+                            log_info "Installing OCI CLI..."
+                            bash -c "$(curl -L https://raw.githubusercontent.com/oracle/oci-cli/master/scripts/install/install.sh)" -- --accept-all-defaults
+                            export PATH="$HOME/bin:$PATH"
+                            ;;
+                        gh)
+                            log_info "Installing GitHub CLI..."
+                            sudo yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+                            sudo yum install -y gh
+                            ;;
+                        jq|git|curl|openssl)
+                            sudo yum install -y "$pkg"
+                            ;;
+                    esac
+                done
+            else
+                log_error "Unsupported Linux distribution"
+                log_error "Please install manually: ${missing[*]}"
+                exit 1
+            fi
+            ;;
+        *)
+            log_error "Unsupported OS: $OS"
+            exit 1
+            ;;
+    esac
+
+    log_success "Dependencies installed"
+}
+
+#=============================================================================
+# Step 2: Validate Authentication
+#=============================================================================
+
+validate_auth() {
+    log_info "Validating authentication..."
 
     # Check OCI CLI authentication
     if ! oci iam region list &> /dev/null; then
-        log_error "OCI CLI not authenticated"
+        log_warn "OCI CLI not configured"
         echo ""
-        echo "Run: oci setup config"
+        log_info "Running OCI CLI setup..."
+        oci setup config
+    fi
+
+    if ! oci iam region list &> /dev/null; then
+        log_error "OCI CLI authentication failed"
         exit 1
     fi
     log_success "OCI CLI authenticated"
 
     # Check GitHub CLI authentication
     if ! gh auth status &> /dev/null; then
-        log_error "GitHub CLI not authenticated"
+        log_warn "GitHub CLI not authenticated"
         echo ""
-        echo "Run: gh auth login"
+        log_info "Running GitHub CLI login..."
+        gh auth login
+    fi
+
+    if ! gh auth status &> /dev/null; then
+        log_error "GitHub CLI authentication failed"
         exit 1
     fi
     log_success "GitHub CLI authenticated"
 }
 
 #=============================================================================
-# Step 2: Get OCI Configuration from CLI
+# Step 3: Get OCI Configuration from CLI
 #=============================================================================
 
 get_oci_config() {
@@ -163,7 +308,7 @@ get_oci_config() {
 }
 
 #=============================================================================
-# Step 3: Get GitHub Repository
+# Step 4: Get GitHub Repository
 #=============================================================================
 
 get_github_repo() {
@@ -204,7 +349,7 @@ get_github_repo() {
 }
 
 #=============================================================================
-# Step 4: Create OCI API Key for GitHub Actions
+# Step 5: Create OCI API Key for GitHub Actions
 #=============================================================================
 
 create_api_key() {
@@ -266,7 +411,7 @@ create_api_key() {
 }
 
 #=============================================================================
-# Step 5: Set GitHub Secrets
+# Step 6: Set GitHub Secrets
 #=============================================================================
 
 set_github_secrets() {
@@ -292,7 +437,7 @@ set_github_secrets() {
 }
 
 #=============================================================================
-# Step 6: Create Compartment
+# Step 7: Create Compartment
 #=============================================================================
 
 create_compartment() {
@@ -326,7 +471,7 @@ create_compartment() {
 }
 
 #=============================================================================
-# Step 7: Get SSH Key
+# Step 8: Get SSH Key
 #=============================================================================
 
 get_ssh_key() {
@@ -357,7 +502,7 @@ get_ssh_key() {
 }
 
 #=============================================================================
-# Step 8: Create and Push terraform.tfvars
+# Step 9: Create and Push terraform.tfvars
 #=============================================================================
 
 create_and_push_tfvars() {
@@ -411,7 +556,7 @@ EOF
 }
 
 #=============================================================================
-# Step 9: Summary
+# Step 10: Summary
 #=============================================================================
 
 print_summary() {
@@ -454,7 +599,8 @@ print_summary() {
 
 main() {
     banner
-    validate_prerequisites
+    install_dependencies
+    validate_auth
     get_oci_config
     get_github_repo
     create_api_key
