@@ -167,19 +167,26 @@ log_section "Step 0b: Time Synchronization"
 if ! command -v chronyd &> /dev/null; then
     log "Installing chrony..."
     if command -v apt-get &> /dev/null; then
-        apt-get update -qq && apt-get install -y -qq chrony
+        apt-get update -qq && apt-get install -y -qq chrony jq
     elif command -v yum &> /dev/null; then
-        yum install -y chrony
+        yum install -y chrony jq
     elif command -v dnf &> /dev/null; then
-        dnf install -y chrony
+        dnf install -y chrony jq
     fi
 else
     log "Chrony already installed"
 fi
 
+# Determine chrony config path (varies by distro)
+if [ -d /etc/chrony ]; then
+    CHRONY_CONF="/etc/chrony/chrony.conf"
+else
+    CHRONY_CONF="/etc/chrony.conf"
+fi
+
 # Configure chrony for accurate time sync
-log "Configuring chrony..."
-cat > /etc/chrony/chrony.conf << 'EOF'
+log "Configuring chrony at $CHRONY_CONF..."
+cat > "$CHRONY_CONF" << 'EOF'
 # Metal Foundry - Chrony NTP Configuration
 # Use Oracle Cloud NTP servers (OCI instances)
 server 169.254.169.123 prefer iburst minpoll 4 maxpoll 4
@@ -217,7 +224,13 @@ log_section "Step 1: K3s Installation"
 
 if ! command -v k3s &> /dev/null; then
     log "Installing K3s..."
-    curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=stable INSTALL_K3S_EXEC="server" sh -
+    # Disable: flannel (using Cilium CNI), traefik (using Cilium Gateway), servicelb (using Cilium L2)
+    # Disable: network-policy (using Cilium network policies)
+    curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=stable INSTALL_K3S_EXEC="server \
+        --flannel-backend=none \
+        --disable-network-policy \
+        --disable=traefik \
+        --disable=servicelb" sh -
 else
     log "K3s already installed"
 fi
@@ -264,17 +277,14 @@ fi
 # Configuration matches kubernetes/infrastructure/cilium/release.yaml exactly
 if ! kubectl get pods -n kube-system -l app.kubernetes.io/name=cilium-agent --no-headers 2>/dev/null | grep -q Running; then
     log "Installing Cilium CNI..."
+    # Configuration matches kubernetes/infrastructure/cilium/release.yaml
     cilium install --version 1.18.4 \
         --set kubeProxyReplacement=true \
         --set k8sServiceHost=localhost \
         --set k8sServicePort=6443 \
-        --set ingressController.enabled=true \
-        --set ingressController.default=true \
-        --set ingressController.loadbalancerMode=shared \
-        --set ingressController.hostNetwork.enabled=true \
-        --set ingressController.enforceHttps=false \
+        --set ingressController.enabled=false \
         --set gatewayAPI.enabled=true \
-        --set gatewayAPI.hostNetwork.enabled=false \
+        --set gatewayAPI.hostNetwork.enabled=true \
         --set l2announcements.enabled=true \
         --set externalIPs.enabled=true \
         --set nodePort.enabled=true \
