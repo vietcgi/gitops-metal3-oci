@@ -28,7 +28,6 @@ NC='\033[0m'
 
 # Detect OS
 OS="$(uname -s)"
-ARCH="$(uname -m)"
 
 # Logging
 log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
@@ -388,31 +387,17 @@ create_api_key() {
         AUTH_FLAG="--auth security_token"
     fi
 
-    # Get user OCID if we don't have it
-    if [[ -z "$OCI_USER" ]]; then
-        log_info "Getting user OCID..."
-        OCI_USER=$(oci iam user list $AUTH_FLAG --limit 1 --query 'data[0].id' --raw-output 2>/dev/null)
-    fi
+    # Get user OCID
+    log_info "Getting user OCID..."
+    OCI_USER=$(oci iam user list $AUTH_FLAG --limit 1 --query 'data[0].id' --raw-output 2>/dev/null)
 
     if [[ -z "$OCI_USER" ]]; then
         log_error "Could not determine user OCID"
         exit 1
     fi
+    log_success "User: ${OCI_USER:0:50}..."
 
-    # Check if we already have a key
-    if [[ -f "$API_KEY_FILE" ]]; then
-        log_info "Found existing API key: $API_KEY_FILE"
-        read -r -p "Use existing key? (Y/n): " use_existing
-        if [[ ! "$use_existing" =~ ^[Nn]$ ]]; then
-            # Get fingerprint of existing key
-            OCI_FINGERPRINT=$(openssl rsa -pubout -in "$API_KEY_FILE" 2>/dev/null | openssl md5 -c | awk '{print $2}')
-            OCI_KEY_CONTENT=$(cat "$API_KEY_FILE")
-            log_success "Using existing API key"
-            return
-        fi
-    fi
-
-    # Create new key
+    # Always generate fresh key to avoid mismatches
     log_info "Generating new API key for GitHub Actions..."
     mkdir -p "$API_KEY_DIR"
     chmod 700 "$API_KEY_DIR"
@@ -421,11 +406,11 @@ create_api_key() {
     openssl genrsa -out "$API_KEY_FILE" 2048 2>/dev/null
     chmod 600 "$API_KEY_FILE"
 
-    # Extract public key
+    # Extract public key in PEM format
     openssl rsa -pubout -in "$API_KEY_FILE" -out "$API_KEY_PUBLIC" 2>/dev/null
 
-    # Calculate fingerprint
-    OCI_FINGERPRINT=$(openssl rsa -pubout -in "$API_KEY_FILE" 2>/dev/null | openssl md5 -c | awk '{print $2}')
+    # Calculate fingerprint (OCI format)
+    OCI_FINGERPRINT=$(cat "$API_KEY_PUBLIC" | openssl md5 -c | awk '{print $2}')
     OCI_KEY_CONTENT=$(cat "$API_KEY_FILE")
 
     log_success "Generated API key: $OCI_FINGERPRINT"
@@ -440,13 +425,22 @@ create_api_key() {
         --raw-output 2>/dev/null || echo "")
 
     if [[ -n "$EXISTING_KEY" && "$EXISTING_KEY" != "null" ]]; then
-        log_info "API key already registered in OCI"
+        log_success "API key already in OCI"
     else
-        oci iam user api-key upload $AUTH_FLAG \
+        if oci iam user api-key upload $AUTH_FLAG \
             --user-id "$OCI_USER" \
-            --key-file "$API_KEY_PUBLIC" > /dev/null 2>&1 && \
-            log_success "Uploaded API key to OCI" || \
-            log_error "Failed to upload API key. You may need to add it manually in OCI Console."
+            --key-file "$API_KEY_PUBLIC" 2>&1; then
+            log_success "Uploaded API key to OCI"
+        else
+            log_error "Failed to upload API key"
+            echo ""
+            echo "Manual fix: Go to OCI Console → Identity → Users → API Keys"
+            echo "Upload this public key:"
+            echo ""
+            cat "$API_KEY_PUBLIC"
+            echo ""
+            read -r -p "Press Enter after adding the key in OCI Console..."
+        fi
     fi
 }
 
@@ -455,38 +449,25 @@ create_api_key() {
 #=============================================================================
 
 set_github_secrets() {
-    log_info "Setting GitHub secrets via gh CLI..."
+    log_info "Setting GitHub secrets..."
 
-    # OCI CLI authentication secrets
-    echo "$OCI_KEY_CONTENT" | gh secret set OCI_CLI_KEY_CONTENT -R "$GITHUB_OWNER/$GITHUB_REPO"
-    log_success "Set: OCI_CLI_KEY_CONTENT"
-
+    # All secrets for Terraform OCI provider
     gh secret set OCI_CLI_USER -R "$GITHUB_OWNER/$GITHUB_REPO" -b "$OCI_USER"
-    log_success "Set: OCI_CLI_USER"
-
     gh secret set OCI_CLI_TENANCY -R "$GITHUB_OWNER/$GITHUB_REPO" -b "$OCI_TENANCY"
-    log_success "Set: OCI_CLI_TENANCY"
-
     gh secret set OCI_CLI_FINGERPRINT -R "$GITHUB_OWNER/$GITHUB_REPO" -b "$OCI_FINGERPRINT"
-    log_success "Set: OCI_CLI_FINGERPRINT"
-
     gh secret set OCI_CLI_REGION -R "$GITHUB_OWNER/$GITHUB_REPO" -b "$OCI_REGION"
-    log_success "Set: OCI_CLI_REGION"
+    echo "$OCI_KEY_CONTENT" | gh secret set OCI_CLI_KEY_CONTENT -R "$GITHUB_OWNER/$GITHUB_REPO"
 
-    # Terraform variables as secrets
-    gh secret set TF_VAR_tenancy_ocid -R "$GITHUB_OWNER/$GITHUB_REPO" -b "$OCI_TENANCY"
-    log_success "Set: TF_VAR_tenancy_ocid"
+    # Terraform variables
+    gh secret set TF_VAR_TENANCY_OCID -R "$GITHUB_OWNER/$GITHUB_REPO" -b "$OCI_TENANCY"
+    gh secret set TF_VAR_USER_OCID -R "$GITHUB_OWNER/$GITHUB_REPO" -b "$OCI_USER"
+    gh secret set TF_VAR_FINGERPRINT -R "$GITHUB_OWNER/$GITHUB_REPO" -b "$OCI_FINGERPRINT"
+    gh secret set TF_VAR_REGION -R "$GITHUB_OWNER/$GITHUB_REPO" -b "$OCI_REGION"
+    gh secret set TF_VAR_COMPARTMENT_OCID -R "$GITHUB_OWNER/$GITHUB_REPO" -b "$OCI_COMPARTMENT"
+    gh secret set TF_VAR_SSH_PUBLIC_KEY -R "$GITHUB_OWNER/$GITHUB_REPO" -b "$SSH_PUBLIC_KEY"
+    echo "$OCI_KEY_CONTENT" | gh secret set TF_VAR_PRIVATE_KEY -R "$GITHUB_OWNER/$GITHUB_REPO"
 
-    gh secret set TF_VAR_compartment_ocid -R "$GITHUB_OWNER/$GITHUB_REPO" -b "$OCI_COMPARTMENT"
-    log_success "Set: TF_VAR_compartment_ocid"
-
-    gh secret set TF_VAR_region -R "$GITHUB_OWNER/$GITHUB_REPO" -b "$OCI_REGION"
-    log_success "Set: TF_VAR_region"
-
-    gh secret set TF_VAR_ssh_public_key -R "$GITHUB_OWNER/$GITHUB_REPO" -b "$SSH_PUBLIC_KEY"
-    log_success "Set: TF_VAR_ssh_public_key"
-
-    log_success "All GitHub secrets configured!"
+    log_success "All secrets configured!"
 }
 
 #=============================================================================
