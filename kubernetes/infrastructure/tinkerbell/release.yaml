@@ -80,6 +80,12 @@ spec:
       download:
         enabled: true
         url: "https://github.com/tinkerbell/hook/releases/download/v0.11.1"
+
+    # HookOS service (ClusterIP - traffic goes through ingress)
+    optional:
+      hookos:
+        service:
+          type: ClusterIP
 ---
 # Ingress for Tinkerbell HTTP endpoints (iPXE boot)
 apiVersion: networking.k8s.io/v1
@@ -102,6 +108,32 @@ spec:
                 name: tinkerbell
                 port:
                   number: 7171
+  tls:
+    - hosts:
+        - tinkerbell.qualityspace.com
+      secretName: tinkerbell-tls
+---
+# Ingress for HookOS artifacts
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hookos
+  namespace: tinkerbell
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: cilium
+  rules:
+    - host: tinkerbell.qualityspace.com
+      http:
+        paths:
+          - path: /hook
+            pathType: Prefix
+            backend:
+              service:
+                name: hookos
+                port:
+                  number: 7173
   tls:
     - hosts:
         - tinkerbell.qualityspace.com
