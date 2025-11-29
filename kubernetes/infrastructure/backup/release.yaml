@@ -29,14 +29,15 @@ spec:
           - mountPath: /target
             name: plugins
     configuration:
-      provider: aws
       backupStorageLocation:
-        bucket: my-backup-bucket
-        config:
-          region: us-east-1
+        - provider: aws
+          bucket: my-backup-bucket
+          config:
+            region: us-east-1
       volumeSnapshotLocation:
-        config:
-          region: us-east-1
+        - provider: aws
+          config:
+            region: us-east-1
     credentials:
       useSecret: true
       secretContents:
