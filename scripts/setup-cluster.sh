@@ -197,9 +197,38 @@ fi
 log "Flux is ready"
 
 #-----------------------------------------------------------------------------
-# Step 5: Setup User Access
+# Step 5: Create Cluster Info ConfigMap
 #-----------------------------------------------------------------------------
-log_section "Step 5: User Access Setup"
+log_section "Step 5: Cluster Info ConfigMap"
+
+# Get public IP from metadata service
+PUBLIC_IP=$(curl -s http://169.254.169.254/opc/v1/vnics/ | jq -r '.[0].publicIp // empty')
+if [ -z "$PUBLIC_IP" ]; then
+    # Fallback: get from hostname resolution
+    PUBLIC_IP=$(curl -s ifconfig.me 2>/dev/null || echo "")
+fi
+
+if [ -n "$PUBLIC_IP" ]; then
+    log "Creating cluster-info ConfigMap with PUBLIC_IP=$PUBLIC_IP"
+    kubectl create namespace tinkerbell --dry-run=client -o yaml | kubectl apply -f -
+    cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cluster-info
+  namespace: tinkerbell
+data:
+  tinkerbell-values.yaml: |
+    publicIP: "$PUBLIC_IP"
+EOF
+else
+    log "WARNING: Could not determine public IP"
+fi
+
+#-----------------------------------------------------------------------------
+# Step 6: Setup User Access
+#-----------------------------------------------------------------------------
+log_section "Step 6: User Access Setup"
 
 # Setup kubeconfig for ubuntu user
 if id ubuntu &>/dev/null; then
