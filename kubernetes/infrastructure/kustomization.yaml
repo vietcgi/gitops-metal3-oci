@@ -8,6 +8,8 @@ resources:
   - local-path
   # Monitoring
   - monitoring
+  # Ingress (Cilium native)
+  - ingress
   # Networking is managed separately (installed during bootstrap)
   # - cilium
   # Bare metal provisioning

@@ -1,0 +1,33 @@
+---
+# Cilium Ingress Controller Configuration
+# This enables Cilium's native ingress support instead of nginx-ingress
+# to reduce resource usage on free tier
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cilium-ingress-config
+  namespace: kube-system
+data:
+  # Cilium ingress is enabled via helm values during installation
+  # This configmap is for documentation and future configuration
+  ingress-controller-enabled: "true"
+  ingress-controller-loadbalancer-mode: "dedicated"
+---
+# Gateway API support (optional, for future use)
+# Cilium supports Gateway API as an alternative to Ingress
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-system
+  labels:
+    name: ingress-system
+---
+# Default ingress class for Cilium
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: cilium
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"
+spec:
+  controller: cilium.io/ingress-controller
