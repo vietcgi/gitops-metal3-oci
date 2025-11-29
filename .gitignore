@@ -24,6 +24,7 @@ kubeconfig
 *.pem
 *.key
 *secret*
+!kubernetes/infrastructure/sealed-secrets/
 credentials*
 .env
 .env.*
