@@ -10,6 +10,9 @@ metadata:
   name: harbor
   namespace: harbor
 spec:
+  # SUSPENDED: Harbor images don't support ARM64 (OCI Free Tier uses aarch64)
+  # Re-enable when running on x86_64 or when Harbor adds ARM64 support
+  suspend: true
   interval: 1h
   chart:
     spec:

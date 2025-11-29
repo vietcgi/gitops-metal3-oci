@@ -72,6 +72,19 @@ spec:
         enabled: true
       ui:
         enabled: true
+      # Hubble metrics for network observability
+      metrics:
+        enabled:
+          - dns
+          - drop
+          - tcp
+          - flow
+          - icmp
+          - http
+        serviceMonitor:
+          enabled: true
+          labels:
+            release: kube-prometheus-stack
 
     # Operator settings
     operator:
@@ -104,6 +117,14 @@ spec:
     # Enable BBR congestion control
     bpf:
       masquerade: true
+
+    # Prometheus metrics
+    prometheus:
+      enabled: true
+      serviceMonitor:
+        enabled: true
+        labels:
+          release: kube-prometheus-stack
 ---
 # L2 Announcement Policy - respond to ARP for LoadBalancer IPs
 # Used when bare metal workers join the cluster

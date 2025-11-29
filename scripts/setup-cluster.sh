@@ -58,6 +58,159 @@ log "Branch: ${BRANCH}"
 check_root
 
 #-----------------------------------------------------------------------------
+# Step 0: System Tuning (sysctl + limits)
+#-----------------------------------------------------------------------------
+log_section "Step 0: System Tuning"
+
+log "Applying sysctl optimizations..."
+cat > /etc/sysctl.d/99-metal-foundry.conf << 'EOF'
+# Metal Foundry - Production System Tuning
+# Based on ansible-infra common role
+
+# Network performance - Optimized for high throughput
+net.ipv4.ip_forward = 1
+net.core.somaxconn = 65536
+net.ipv4.tcp_max_syn_backlog = 2048
+net.ipv4.tcp_tw_reuse = 1
+net.ipv4.tcp_fin_timeout = 10
+
+# Multipath routing optimizations
+net.ipv4.fib_multipath_hash_policy = 1
+net.ipv4.fib_multipath_use_neigh = 1
+
+# ARP cache optimizations (high-traffic environments)
+net.ipv4.neigh.default.gc_thresh1 = 80000
+net.ipv4.neigh.default.gc_thresh2 = 90000
+net.ipv4.neigh.default.gc_thresh3 = 100000
+
+# TCP buffer optimization (throughput for gigabit+ networks)
+net.ipv4.tcp_rmem = 4096 131072 6291456
+net.ipv4.tcp_wmem = 4096 16384 4194304
+
+# Port range for high-connection scenarios
+net.ipv4.ip_local_port_range = 1024 65535
+net.ipv4.tcp_moderate_rcvbuf = 1
+
+# File system optimizations
+fs.file-max = 12000500
+fs.nr_open = 20000500
+
+# Security hardening
+net.ipv4.conf.all.send_redirects = 0
+net.ipv4.conf.default.send_redirects = 0
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv4.conf.default.accept_source_route = 0
+
+# ICMP hardening
+net.ipv4.icmp_echo_ignore_broadcasts = 1
+net.ipv4.icmp_ignore_bogus_error_responses = 1
+
+# Kubernetes/Cilium specific
+net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+
+# Memory overcommit for Kubernetes
+vm.overcommit_memory = 1
+vm.panic_on_oom = 0
+
+# Inotify limits for large clusters
+fs.inotify.max_user_watches = 524288
+fs.inotify.max_user_instances = 512
+EOF
+
+# Load br_netfilter module for bridge settings
+modprobe br_netfilter 2>/dev/null || true
+
+# Apply sysctl settings
+sysctl --system > /dev/null 2>&1 || true
+log "Sysctl optimizations applied"
+
+log "Configuring file limits..."
+cat > /etc/security/limits.d/99-metal-foundry.conf << 'EOF'
+# Metal Foundry - Production File Limits
+# Based on ansible-infra common role
+
+# File descriptor limits
+* soft nofile 1039999
+* hard nofile 1039999
+root soft nofile 1039999
+root hard nofile 1039999
+
+# Process limits for high-concurrency environments
+* soft nproc 9999999
+* hard nproc 9999999
+root soft nproc unlimited
+root hard nproc unlimited
+
+# Memory lock (for Kubernetes)
+* soft memlock unlimited
+* hard memlock unlimited
+EOF
+log "File limits configured"
+
+# Ensure limits are applied to systemd services
+mkdir -p /etc/systemd/system.conf.d
+cat > /etc/systemd/system.conf.d/99-metal-foundry.conf << 'EOF'
+[Manager]
+DefaultLimitNOFILE=1039999
+DefaultLimitNPROC=9999999
+DefaultLimitMEMLOCK=infinity
+EOF
+systemctl daemon-reexec 2>/dev/null || true
+log "Systemd limits configured"
+
+#-----------------------------------------------------------------------------
+# Step 0b: Time Synchronization (chrony)
+#-----------------------------------------------------------------------------
+log_section "Step 0b: Time Synchronization"
+
+if ! command -v chronyd &> /dev/null; then
+    log "Installing chrony..."
+    if command -v apt-get &> /dev/null; then
+        apt-get update -qq && apt-get install -y -qq chrony
+    elif command -v yum &> /dev/null; then
+        yum install -y chrony
+    elif command -v dnf &> /dev/null; then
+        dnf install -y chrony
+    fi
+else
+    log "Chrony already installed"
+fi
+
+# Configure chrony for accurate time sync
+log "Configuring chrony..."
+cat > /etc/chrony/chrony.conf << 'EOF'
+# Metal Foundry - Chrony NTP Configuration
+# Use Oracle Cloud NTP servers (OCI instances)
+server 169.254.169.123 prefer iburst minpoll 4 maxpoll 4
+
+# Fallback to public NTP pools
+pool time.google.com iburst maxsources 4
+pool time.cloudflare.com iburst maxsources 2
+pool pool.ntp.org iburst maxsources 4
+
+# Record the rate at which the system clock gains/loses time
+driftfile /var/lib/chrony/drift
+
+# Allow the system clock to be stepped in the first three updates
+makestep 1.0 3
+
+# Enable kernel synchronization of the real-time clock (RTC)
+rtcsync
+
+# Specify directory for log files
+logdir /var/log/chrony
+
+# Enable hardware timestamping if available
+hwtimestamp *
+EOF
+
+# Restart chrony to apply configuration
+systemctl enable chrony
+systemctl restart chrony
+log "Chrony configured and running"
+
+#-----------------------------------------------------------------------------
 # Step 1: Install K3s
 #-----------------------------------------------------------------------------
 log_section "Step 1: K3s Installation"
