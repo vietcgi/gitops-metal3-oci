@@ -18,6 +18,8 @@ locals {
   is_arm = var.control_plane_shape == "VM.Standard.A1.Flex"
 }
 
+# Note: ubuntu_image_id local is defined below after data sources
+
 #=============================================================================
 # Data Sources
 #=============================================================================
@@ -27,20 +29,29 @@ data "oci_identity_availability_domains" "ads" {
   compartment_id = var.tenancy_ocid
 }
 
-# Get latest Ubuntu 24.04 LTS image
-data "oci_core_images" "ubuntu" {
+# Get latest Ubuntu LTS image compatible with shape
+# Ubuntu 24.04 may not be available in all regions for ARM - fallback to 22.04
+data "oci_core_images" "ubuntu_24" {
   compartment_id           = var.compartment_ocid
   operating_system         = "Canonical Ubuntu"
   operating_system_version = "24.04"
   shape                    = var.control_plane_shape
   sort_by                  = "TIMECREATED"
   sort_order               = "DESC"
+}
 
-  filter {
-    name   = "display_name"
-    values = ["^Canonical-Ubuntu-24\\.04-(aarch64-)?[\\d\\.]+$"]
-    regex  = true
-  }
+data "oci_core_images" "ubuntu_22" {
+  compartment_id           = var.compartment_ocid
+  operating_system         = "Canonical Ubuntu"
+  operating_system_version = "22.04"
+  shape                    = var.control_plane_shape
+  sort_by                  = "TIMECREATED"
+  sort_order               = "DESC"
+}
+
+locals {
+  # Use Ubuntu 24.04 if available, otherwise fallback to 22.04
+  ubuntu_image_id = length(data.oci_core_images.ubuntu_24.images) > 0 ? data.oci_core_images.ubuntu_24.images[0].id : data.oci_core_images.ubuntu_22.images[0].id
 }
 
 #=============================================================================
@@ -77,7 +88,7 @@ module "control_plane" {
   shape          = var.control_plane_shape
   ocpus          = local.is_arm ? var.control_plane_ocpus : null
   memory_gb      = local.is_arm ? var.control_plane_memory_gb : null
-  image_id       = data.oci_core_images.ubuntu.images[0].id
+  image_id       = local.ubuntu_image_id
   ssh_public_key = var.ssh_public_key
 
   # Boot volume
