@@ -133,27 +133,32 @@ log "Waiting for Cilium to be ready..."
 cilium status --wait --wait-duration 5m || true
 log "Cilium is ready"
 
-# Configure Cilium L2 LoadBalancer IP Pool
-log "Configuring Cilium L2 LoadBalancer..."
-PUBLIC_IP=$(curl -s --connect-timeout 5 http://169.254.169.254/opc/v1/vnics/ 2>/dev/null | jq -r '.[0].publicIp // empty' || echo "")
-if [ -z "$PUBLIC_IP" ]; then
-    PUBLIC_IP=$(curl -s --connect-timeout 5 ifconfig.me 2>/dev/null || echo "")
+# Configure Cilium for external access
+# NOTE: In cloud environments with NAT (OCI, AWS, GCP), we DON'T use L2 LoadBalancer
+# because the public IP is NAT'd by the cloud provider, not announced via ARP.
+# Instead, we patch the cilium-ingress service to use externalIPs with the private IP.
+log "Configuring Cilium for external access..."
+PRIVATE_IP=$(curl -s --connect-timeout 5 http://169.254.169.254/opc/v1/vnics/ 2>/dev/null | jq -r '.[0].privateIp // empty' || echo "")
+if [ -z "$PRIVATE_IP" ]; then
+    # Fallback: get the IP from the primary interface
+    PRIVATE_IP=$(ip -4 addr show scope global | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1 || echo "")
 fi
 
-if [ -n "$PUBLIC_IP" ]; then
-    log "Creating CiliumLoadBalancerIPPool with IP: $PUBLIC_IP"
-    cat <<EOF | kubectl apply -f -
-apiVersion: cilium.io/v2alpha1
-kind: CiliumLoadBalancerIPPool
-metadata:
-  name: public-pool
-spec:
-  blocks:
-    - start: "$PUBLIC_IP"
-      stop: "$PUBLIC_IP"
-EOF
+if [ -n "$PRIVATE_IP" ]; then
+    log "Node private IP: $PRIVATE_IP"
+    log "Patching cilium-ingress service with externalIPs..."
+    # Wait for cilium-ingress service to be created
+    until kubectl get svc cilium-ingress -n kube-system &>/dev/null; do
+        log "Waiting for cilium-ingress service..."
+        sleep 5
+    done
+    # Patch the service to add externalIPs - this makes Cilium route traffic
+    # arriving at the private IP (after cloud NAT) to the ingress pods
+    kubectl patch svc cilium-ingress -n kube-system --type=merge \
+        -p "{\"spec\":{\"externalIPs\":[\"$PRIVATE_IP\"]}}" || true
+    log "cilium-ingress service patched with externalIPs"
 else
-    log "WARNING: Could not determine public IP for LoadBalancer pool"
+    log "WARNING: Could not determine private IP for external access"
 fi
 
 #-----------------------------------------------------------------------------
