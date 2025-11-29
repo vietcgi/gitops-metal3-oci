@@ -110,7 +110,7 @@ fi
 # Install Cilium CNI
 if ! kubectl get pods -n kube-system -l app.kubernetes.io/name=cilium-agent --no-headers 2>/dev/null | grep -q Running; then
     log "Installing Cilium CNI..."
-    cilium install \
+    cilium install --version stable \
         --set kubeProxyReplacement=true \
         --set ingressController.enabled=true \
         --set ingressController.default=true \
@@ -118,6 +118,12 @@ if ! kubectl get pods -n kube-system -l app.kubernetes.io/name=cilium-agent --no
         --set l2announcements.enabled=true \
         --set hubble.enabled=true \
         --set hubble.relay.enabled=true
+
+    # Patch ConfigMap to ensure shared mode is set (workaround for CLI not applying it)
+    log "Configuring Cilium ingress shared mode..."
+    sleep 10
+    kubectl patch configmap cilium-config -n kube-system --type=merge \
+        -p '{"data":{"ingress-default-lb-mode":"shared","ingress-hostnetwork-enabled":"false"}}' || true
 else
     log "Cilium already installed"
 fi
