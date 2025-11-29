@@ -133,11 +133,10 @@ log "Waiting for Cilium to be ready..."
 cilium status --wait --wait-duration 5m || true
 log "Cilium is ready"
 
-# Configure Cilium for external access
-# NOTE: In cloud environments with NAT (OCI, AWS, GCP), we DON'T use L2 LoadBalancer
-# because the public IP is NAT'd by the cloud provider, not announced via ARP.
-# Instead, we patch the cilium-ingress service to use externalIPs with the private IP.
-log "Configuring Cilium for external access..."
+# Configure Cilium LoadBalancer IP Pool
+# Create a CiliumLoadBalancerIPPool with the node's private IP so that
+# LoadBalancer services and Gateways can be assigned this IP.
+log "Configuring Cilium LoadBalancer IP Pool..."
 PRIVATE_IP=$(curl -s --connect-timeout 5 http://169.254.169.254/opc/v1/vnics/ 2>/dev/null | jq -r '.[0].privateIp // empty' || echo "")
 if [ -z "$PRIVATE_IP" ]; then
     # Fallback: get the IP from the primary interface
@@ -146,19 +145,20 @@ fi
 
 if [ -n "$PRIVATE_IP" ]; then
     log "Node private IP: $PRIVATE_IP"
-    log "Patching cilium-ingress service with externalIPs..."
-    # Wait for cilium-ingress service to be created
-    until kubectl get svc cilium-ingress -n kube-system &>/dev/null; do
-        log "Waiting for cilium-ingress service..."
-        sleep 5
-    done
-    # Patch the service to add externalIPs - this makes Cilium route traffic
-    # arriving at the private IP (after cloud NAT) to the ingress pods
-    kubectl patch svc cilium-ingress -n kube-system --type=merge \
-        -p "{\"spec\":{\"externalIPs\":[\"$PRIVATE_IP\"]}}" || true
-    log "cilium-ingress service patched with externalIPs"
+    log "Creating CiliumLoadBalancerIPPool..."
+    cat <<EOF | kubectl apply -f -
+apiVersion: cilium.io/v2alpha1
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: default-pool
+spec:
+  blocks:
+    - start: "${PRIVATE_IP}"
+      stop: "${PRIVATE_IP}"
+EOF
+    log "CiliumLoadBalancerIPPool created with IP: $PRIVATE_IP"
 else
-    log "WARNING: Could not determine private IP for external access"
+    log "WARNING: Could not determine private IP for LoadBalancer pool"
 fi
 
 #-----------------------------------------------------------------------------
