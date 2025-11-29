@@ -34,11 +34,22 @@ spec:
       enforceHttps: false
 
     # Enable Gateway API (preferred over Ingress)
-    # Use LoadBalancer mode to get IP from CiliumLoadBalancerIPPool
+    # Use hostNetwork mode for direct port 80/443 binding on bare metal
     gatewayAPI:
       enabled: true
       hostNetwork:
-        enabled: false
+        enabled: true
+
+    # Envoy proxy settings - required for privileged port binding
+    envoy:
+      enabled: true
+      securityContext:
+        capabilities:
+          keepCapNetBindService: true
+          envoy:
+            - NET_BIND_SERVICE
+            - NET_ADMIN
+            - SYS_ADMIN
 
     # Enable L2 announcements for LoadBalancer services (bare metal)
     l2announcements:
