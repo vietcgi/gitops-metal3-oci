@@ -104,6 +104,17 @@ variable "boot_volume_size_gb" {
   }
 }
 
+variable "availability_domain_index" {
+  description = "Index of availability domain to use (0, 1, or 2). Try different values if capacity is unavailable."
+  type        = number
+  default     = 0
+
+  validation {
+    condition     = var.availability_domain_index >= 0 && var.availability_domain_index <= 2
+    error_message = "Availability domain index must be 0, 1, or 2"
+  }
+}
+
 #=============================================================================
 # Optional Settings
 #=============================================================================
