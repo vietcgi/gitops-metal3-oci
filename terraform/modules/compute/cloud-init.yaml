@@ -99,59 +99,72 @@ runcmd:
   # Install K3s (latest stable, without flannel - we'll use Cilium)
   - |
     echo "Installing K3s..." >> /var/log/metal-foundry-init.log
-    curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=stable INSTALL_K3S_EXEC="server" sh -
+    if ! command -v k3s &> /dev/null; then
+      curl -sfL https://get.k3s.io | INSTALL_K3S_CHANNEL=stable INSTALL_K3S_EXEC="server" sh -
+    fi
 
   # Wait for K3s to be ready
   - |
     echo "Waiting for K3s..." >> /var/log/metal-foundry-init.log
+    export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
     until kubectl get nodes 2>/dev/null; do sleep 5; done
 
   # Install Helm
   - |
     echo "Installing Helm..." >> /var/log/metal-foundry-init.log
-    curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+    if ! command -v helm &> /dev/null; then
+      curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+    fi
 
   # Install Cilium CLI
   - |
     echo "Installing Cilium CLI..." >> /var/log/metal-foundry-init.log
-    CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
-    CLI_ARCH=amd64
-    if [ "$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi
-    curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-${CLI_ARCH}.tar.gz
-    tar xzvf cilium-linux-${CLI_ARCH}.tar.gz -C /usr/local/bin
-    rm cilium-linux-${CLI_ARCH}.tar.gz
+    if ! command -v cilium &> /dev/null; then
+      CILIUM_CLI_VERSION=$$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
+      CLI_ARCH=amd64
+      if [ "$$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi
+      curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/$${CILIUM_CLI_VERSION}/cilium-linux-$${CLI_ARCH}.tar.gz
+      tar xzvf cilium-linux-$${CLI_ARCH}.tar.gz -C /usr/local/bin
+      rm cilium-linux-$${CLI_ARCH}.tar.gz
+    fi
 
   # Install Cilium CNI (latest stable)
   - |
     echo "Installing Cilium..." >> /var/log/metal-foundry-init.log
     export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-    cilium install
+    if ! kubectl get ns cilium-system &> /dev/null; then
+      cilium install
+    fi
 
   # Wait for Cilium to be ready
   - |
     echo "Waiting for Cilium..." >> /var/log/metal-foundry-init.log
     export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-    cilium status --wait
+    cilium status --wait || true
 
   # Install Flux CLI (latest)
   - |
     echo "Installing Flux CLI..." >> /var/log/metal-foundry-init.log
-    curl -s https://fluxcd.io/install.sh | bash
+    if ! command -v flux &> /dev/null; then
+      curl -s https://fluxcd.io/install.sh | bash
+    fi
 
   # Install kubectl krew plugin manager
   - |
     echo "Installing krew..." >> /var/log/metal-foundry-init.log
-    (
-      set -x; cd "$(mktemp -d)" &&
-      OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
-      ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')" &&
-      KREW="krew-${OS}_${ARCH}" &&
-      curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" &&
-      tar zxvf "${KREW}.tar.gz" &&
-      ./"${KREW}" install krew
-    )
-    echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> /root/.bashrc
-    echo 'export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"' >> /home/ubuntu/.bashrc
+    if ! command -v kubectl-krew &> /dev/null; then
+      (
+        set -x; cd "$$(mktemp -d)" &&
+        OS="$$(uname | tr '[:upper:]' '[:lower:]')" &&
+        ARCH="$$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/arm64/')" &&
+        KREW="krew-$${OS}_$${ARCH}" &&
+        curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/$${KREW}.tar.gz" &&
+        tar zxvf "$${KREW}.tar.gz" &&
+        ./"$${KREW}" install krew
+      )
+    fi
+    grep -q 'KREW_ROOT' /root/.bashrc || echo 'export PATH="$${KREW_ROOT:-$$HOME/.krew}/bin:$$PATH"' >> /root/.bashrc
+    grep -q 'KREW_ROOT' /home/ubuntu/.bashrc || echo 'export PATH="$${KREW_ROOT:-$$HOME/.krew}/bin:$$PATH"' >> /home/ubuntu/.bashrc
 
   # Make kubeconfig accessible to ubuntu user
   - |
