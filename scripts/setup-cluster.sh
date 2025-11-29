@@ -114,6 +114,8 @@ if ! kubectl get pods -n kube-system -l app.kubernetes.io/name=cilium-agent --no
         --set kubeProxyReplacement=true \
         --set ingressController.enabled=true \
         --set ingressController.default=true \
+        --set ingressController.loadBalancerMode=shared \
+        --set l2announcements.enabled=true \
         --set hubble.enabled=true \
         --set hubble.relay.enabled=true
 else
