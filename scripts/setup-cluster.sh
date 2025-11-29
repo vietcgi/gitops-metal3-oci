@@ -260,51 +260,65 @@ else
 fi
 
 #-----------------------------------------------------------------------------
-# Step 3: Install Cilium
+# Step 3: Install Cilium via Helm (matches Flux HelmRelease values)
 #-----------------------------------------------------------------------------
 log_section "Step 3: Cilium CNI Installation"
 
-# Install Cilium CLI
-if ! command -v cilium &> /dev/null; then
-    log "Installing Cilium CLI..."
-    CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
-    CLI_ARCH=amd64
-    if [ "$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi
-    curl -L --fail --remote-name-all "https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-${CLI_ARCH}.tar.gz"
-    tar xzvf "cilium-linux-${CLI_ARCH}.tar.gz" -C /usr/local/bin
-    rm -f "cilium-linux-${CLI_ARCH}.tar.gz"
-else
-    log "Cilium CLI already installed"
-fi
+# Add Cilium Helm repository
+log "Adding Cilium Helm repository..."
+helm repo add cilium https://helm.cilium.io/
+helm repo update
 
-# Install Cilium CNI
-# Configuration matches kubernetes/infrastructure/cilium/release.yaml exactly
+# Install Cilium CNI via Helm
+# Configuration matches kubernetes/infrastructure/cilium/release.yaml EXACTLY
 if ! kubectl get pods -n kube-system -l app.kubernetes.io/name=cilium-agent --no-headers 2>/dev/null | grep -q Running; then
-    log "Installing Cilium CNI..."
-    # Configuration matches kubernetes/infrastructure/cilium/release.yaml
-    cilium install --version 1.18.4 \
+    log "Installing Cilium CNI via Helm..."
+    helm install cilium cilium/cilium --version 1.18.4 \
+        --namespace kube-system \
         --set kubeProxyReplacement=true \
         --set k8sServiceHost=localhost \
         --set k8sServicePort=6443 \
         --set ingressController.enabled=false \
+        --set ingressController.loadbalancerMode=shared \
+        --set ingressController.default=true \
+        --set ingressController.hostNetwork.enabled=true \
+        --set ingressController.enforceHttps=false \
         --set gatewayAPI.enabled=true \
         --set gatewayAPI.hostNetwork.enabled=false \
+        --set envoy.enabled=true \
+        --set envoy.securityContext.capabilities.keepCapNetBindService=true \
+        --set "envoy.securityContext.capabilities.envoy={NET_BIND_SERVICE,NET_ADMIN,SYS_ADMIN}" \
         --set l2announcements.enabled=true \
         --set externalIPs.enabled=true \
         --set nodePort.enabled=true \
         --set hubble.enabled=true \
         --set hubble.relay.enabled=true \
         --set hubble.ui.enabled=true \
+        --set "hubble.metrics.enabled={dns,drop,tcp,flow,icmp,http}" \
+        --set hubble.metrics.serviceMonitor.enabled=false \
+        --set operator.replicas=1 \
+        --set operator.resources.limits.cpu=100m \
+        --set operator.resources.limits.memory=128Mi \
+        --set operator.resources.requests.cpu=10m \
+        --set operator.resources.requests.memory=64Mi \
+        --set resources.limits.cpu=500m \
+        --set resources.limits.memory=512Mi \
+        --set resources.requests.cpu=100m \
+        --set resources.requests.memory=128Mi \
         --set ipam.mode=kubernetes \
         --set bandwidthManager.enabled=true \
-        --set bpf.masquerade=true
+        --set bpf.masquerade=true \
+        --set prometheus.enabled=true \
+        --set prometheus.serviceMonitor.enabled=false \
+        --wait \
+        --timeout 10m
 else
     log "Cilium already installed"
 fi
 
-# Wait for Cilium
-log "Waiting for Cilium to be ready..."
-cilium status --wait --wait-duration 5m || true
+# Wait for Cilium pods to be ready
+log "Waiting for Cilium pods to be ready..."
+kubectl wait --for=condition=ready pod -l k8s-app=cilium -n kube-system --timeout=300s 2>/dev/null || true
 log "Cilium is ready"
 
 # Configure Cilium LoadBalancer IP Pool
@@ -334,6 +348,24 @@ EOF
 else
     log "WARNING: Could not determine private IP for LoadBalancer pool"
 fi
+
+# Create L2 Announcement Policy (matches kubernetes/infrastructure/cilium/release.yaml)
+log "Creating CiliumL2AnnouncementPolicy..."
+cat <<EOF | kubectl apply -f -
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: default-l2-policy
+  namespace: kube-system
+spec:
+  interfaces:
+    - ^eth[0-9]+
+    - ^en[a-z0-9]+
+    - ^ens[0-9]+
+  externalIPs: true
+  loadBalancerIPs: true
+EOF
+log "CiliumL2AnnouncementPolicy created"
 
 # Create GatewayClass for Cilium Gateway API
 # This is required for Cilium to process Gateway resources
