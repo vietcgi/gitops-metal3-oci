@@ -31,12 +31,17 @@ permissions:
 env:
   TF_VERSION: '1.5.7'
   TF_WORKING_DIR: 'terraform'
-  # OCI CLI environment variables (from GitHub Secrets)
+  # OCI CLI authentication
   OCI_CLI_USER: ${{ secrets.OCI_CLI_USER }}
   OCI_CLI_TENANCY: ${{ secrets.OCI_CLI_TENANCY }}
   OCI_CLI_FINGERPRINT: ${{ secrets.OCI_CLI_FINGERPRINT }}
   OCI_CLI_KEY_CONTENT: ${{ secrets.OCI_CLI_KEY_CONTENT }}
   OCI_CLI_REGION: ${{ secrets.OCI_CLI_REGION }}
+  # Terraform variables
+  TF_VAR_tenancy_ocid: ${{ secrets.TF_VAR_tenancy_ocid }}
+  TF_VAR_compartment_ocid: ${{ secrets.TF_VAR_compartment_ocid }}
+  TF_VAR_region: ${{ secrets.TF_VAR_region }}
+  TF_VAR_ssh_public_key: ${{ secrets.TF_VAR_ssh_public_key }}
 
 jobs:
   validate:
