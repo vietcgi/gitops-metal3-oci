@@ -41,10 +41,10 @@ env:
   # S3 backend credentials (OCI Object Storage)
   AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  # S3 backend config
+  # S3 backend config (bucket stays in original region)
   TF_STATE_BUCKET: 'metal-foundry-state'
-  TF_STATE_REGION: ${{ secrets.TF_VAR_REGION }}
-  TF_STATE_ENDPOINT: 'https://${{ secrets.OCI_NAMESPACE }}.compat.objectstorage.${{ secrets.TF_VAR_REGION }}.oraclecloud.com'
+  TF_STATE_REGION: ${{ secrets.OCI_STATE_REGION }}
+  TF_STATE_ENDPOINT: 'https://${{ secrets.OCI_NAMESPACE }}.compat.objectstorage.${{ secrets.OCI_STATE_REGION }}.oraclecloud.com'
   # Terraform provider variables (lowercase env var, uppercase secret)
   TF_VAR_tenancy_ocid: ${{ secrets.TF_VAR_TENANCY_OCID }}
   TF_VAR_user_ocid: ${{ secrets.TF_VAR_USER_OCID }}
