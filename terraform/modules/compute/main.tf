@@ -71,10 +71,11 @@ resource "oci_core_instance" "control_plane" {
 
   freeform_tags = var.tags
 
-  # Lifecycle - prevent accidental destruction
+  # Lifecycle - prevent recreation on non-critical changes
   lifecycle {
     ignore_changes = [
       source_details[0].source_id, # Ignore image updates
+      metadata,                     # Ignore cloud-init changes (run manually if needed)
     ]
   }
 }
