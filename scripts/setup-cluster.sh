@@ -108,22 +108,29 @@ else
 fi
 
 # Install Cilium CNI
+# Configuration matches kubernetes/infrastructure/cilium/release.yaml exactly
 if ! kubectl get pods -n kube-system -l app.kubernetes.io/name=cilium-agent --no-headers 2>/dev/null | grep -q Running; then
     log "Installing Cilium CNI..."
-    cilium install --version stable \
+    cilium install --version 1.18.4 \
         --set kubeProxyReplacement=true \
+        --set k8sServiceHost=localhost \
+        --set k8sServicePort=6443 \
         --set ingressController.enabled=true \
         --set ingressController.default=true \
-        --set ingressController.loadBalancerMode=shared \
+        --set ingressController.loadbalancerMode=shared \
+        --set ingressController.hostNetwork.enabled=true \
+        --set ingressController.enforceHttps=false \
+        --set gatewayAPI.enabled=true \
+        --set gatewayAPI.hostNetwork.enabled=false \
         --set l2announcements.enabled=true \
+        --set externalIPs.enabled=true \
+        --set nodePort.enabled=true \
         --set hubble.enabled=true \
-        --set hubble.relay.enabled=true
-
-    # Patch ConfigMap to configure ingress and Gateway API modes
-    log "Configuring Cilium ingress and Gateway API..."
-    sleep 10
-    kubectl patch configmap cilium-config -n kube-system --type=merge \
-        -p '{"data":{"ingress-default-lb-mode":"shared","ingress-hostnetwork-enabled":"false","gateway-api-hostnetwork-enabled":"false"}}' || true
+        --set hubble.relay.enabled=true \
+        --set hubble.ui.enabled=true \
+        --set ipam.mode=kubernetes \
+        --set bandwidthManager.enabled=true \
+        --set bpf.masquerade=true
 else
     log "Cilium already installed"
 fi
