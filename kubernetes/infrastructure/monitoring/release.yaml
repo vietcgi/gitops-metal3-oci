@@ -126,7 +126,7 @@ spec:
     kubeProxy:
       enabled: false  # Using Cilium instead
 ---
-# HTTPRoute for Grafana (via Cloudflare - HTTP only at origin)
+# HTTPRoute for Grafana
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -136,9 +136,15 @@ spec:
   parentRefs:
     - name: main-gateway
       namespace: ingress
+      sectionName: http-grafana
+    - name: main-gateway
+      namespace: ingress
+      sectionName: https-grafana
   hostnames:
     - grafana.qualityspace.com
   rules:
     - backendRefs:
+        - name: kube-prometheus-stack-grafana
+          port: 80
         - name: kube-prometheus-stack-grafana
           port: 80
