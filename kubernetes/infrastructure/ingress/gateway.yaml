@@ -16,7 +16,7 @@ metadata:
 spec:
   addresses:
   - type: IPAddress
-    value: "0.0.0.0"
+    value: "10.0.1.11"
   gatewayClassName: cilium
   listeners:
     # HTTP listener - for ACME HTTP-01 challenges and plain HTTP
