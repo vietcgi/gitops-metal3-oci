@@ -1,0 +1,50 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: tinkerbell-alerts
+  namespace: monitoring
+spec:
+  groups:
+  - name: tinkerbell.rules
+    rules:
+    - alert: TinkerbellComponentsDown
+      expr: up{job=~"tinkerbell-.*"} == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Tinkerbell component {{ $labels.instance }} is down"
+        description: "Tinkerbell component {{ $labels.job }} at {{ $labels.instance }} has been down for more than 5 minutes."
+    
+    - alert: HighProvisioningFailureRate
+      expr: |
+        (
+          rate(tink_workflow_errors_total[5m]) 
+          / 
+          rate(tink_workflow_requests_total[5m])
+        ) > 0.05
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "High provisioning failure rate detected"
+        description: "More than 5% of provisioning workflows are failing in the last 5 minutes."
+    
+    - alert: TinkerbellQueueBacklog
+      expr: tink_workflow_queue_length > 10
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Tinkerbell workflow queue backlog detected"
+        description: "Tinkerbell workflow queue has more than 10 items waiting for more than 10 minutes."
+    
+    - alert: HardwareProvisioningStuck
+      expr: |
+        time() - max by(hardware) (tink_last_status_update_timestamp) > 600
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Hardware provisioning stuck"
+        description: "Hardware {{ $labels.hardware }} has not updated status for more than 10 minutes."

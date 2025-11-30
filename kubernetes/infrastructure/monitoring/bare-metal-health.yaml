@@ -1,0 +1,46 @@
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tinkerbell-components
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: tinkerbell
+  namespaceSelector:
+    matchNames:
+    - tinkerbell
+  endpoints:
+  - port: http
+    interval: 15s
+    path: /healthz
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_pod_name]
+      targetLabel: pod
+  - port: http
+    interval: 60s
+    path: /readyz
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_pod_name]
+      targetLabel: pod
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: boot-media-status
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app: tinkerbell-hegel
+  namespaceSelector:
+    matchNames:
+    - tinkerbell
+  endpoints:
+  - port: metrics
+    interval: 30s
+    path: /metrics
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_pod_name]
+      targetLabel: pod

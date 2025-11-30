@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  hardware-provisioning.json: |
+    {
+      "dashboard": {
+        "id": null,
+        "title": "Hardware Provisioning",
+        "tags": ["tinkerbell", "bare-metal", "provisioning"],
+        "timezone": "browser",
+        "panels": [
+          {
+            "id": 1,
+            "title": "Provisioning Status",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(tink_workflow_status_total{state=\"complete\"})",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "id": 2,
+            "title": "Provisioning Workflow Status",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "rate(tink_workflow_status_total[5m])",
+                "legendFormat": "{{state}}",
+                "refId": "A"
+              }
+            ]
+          },
+          {
+            "id": 3,
+            "title": "Hardware Health",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "count(tink_hardware_status)",
+                "refId": "A"
+              }
+            ],
+            "fieldConfig": {
+              "defaults": {
+                "color": {
+                  "mode": "thresholds"
+                },
+                "thresholds": {
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 80
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        ]
+      }
+    }

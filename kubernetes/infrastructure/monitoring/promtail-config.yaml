@@ -1,0 +1,68 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promtail-config
+  namespace: monitoring
+data:
+  promtail.yaml: |
+    server:
+      http_listen_port: 9080
+      grpc_listen_port: 0
+
+    clients:
+      - url: http://loki:3100/loki/api/v1/push
+
+    scrape_configs:
+    - job_name: kubernetes-pods
+      kubernetes_sd_configs:
+      - role: pod
+      relabel_configs:
+      - source_labels:
+        - __meta_kubernetes_pod_annotation_promtail_io_pipeline
+        target_label: __tmp_promtail_pipeline
+        action: keep
+        regex: .+
+
+    - job_name: kubernetes-nodes
+      kubernetes_sd_configs:
+      - role: node
+      relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: ${1}:9100
+      - source_labels: [__meta_kubernetes_node_name]
+        target_label: node_name
+
+    - job_name: kubernetes-pods-app
+      pipeline_stages:
+        - match:
+            selector: '{app="tinkerbell"}'
+            stages:
+              - multiline:
+                  firstline: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}'
+                  max_wait_time: 3s
+              - regex:
+                  expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[(?P<level>\w+)\] (?P<message>.*)'
+              - timestamp:
+                  source: timestamp
+                  format: '2006-01-02 15:04:05'
+      kubernetes_sd_configs:
+      - role: pod
+      relabel_configs:
+      - source_labels:
+        - __meta_kubernetes_pod_annotation_kubernetes_io_config_hash
+        target_label: __tmp_hash
+      - source_labels:
+        - __meta_kubernetes_pod_name
+        target_label: pod
+      - source_labels:
+        - __meta_kubernetes_namespace
+        target_label: namespace
+      - replacement: /var/log/pods/*$1/*.log
+        separator: _
+        target_label: __path__
+        action: replace
+        source_labels:
+        - __meta_kubernetes_pod_uid
+        - __meta_kubernetes_pod_container_name

@@ -6,3 +6,10 @@ resources:
   - loki.yaml
   - tempo.yaml
   - jaeger.yaml
+  - tinkerbell-service-monitors.yaml
+  - tinkerbell-alerting-rules.yaml
+  - promtail-daemonset.yaml
+  - promtail-config.yaml
+  - grafana-dashboards.yaml
+  - network-monitoring.yaml
+  - bare-metal-health.yaml

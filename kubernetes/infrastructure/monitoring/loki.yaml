@@ -5,7 +5,6 @@ metadata:
   name: loki
   namespace: monitoring
 spec:
-  suspend: true
   interval: 1h
   chart:
     spec:
@@ -18,6 +17,7 @@ spec:
   values:
     deploymentMode: SingleBinary
     loki:
+      auth_enabled: false
       commonConfig:
         replication_factor: 1
       storage:
@@ -37,6 +37,18 @@ spec:
         enabled: true
         size: 10Gi
         storageClass: local-path
+    # Remove conflicting configurations for other deployment modes
+    gateway:
+      enabled: false
+    read:
+      replicas: 0
+    write:
+      replicas: 0
+    backend:
+      replicas: 0
     monitoring:
       serviceMonitor:
         enabled: true
+    # Make sure other deployment modes are disabled
+    simpleScalable:
+      enabled: false

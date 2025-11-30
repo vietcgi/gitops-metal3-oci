@@ -1,0 +1,62 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tinkerbell-smee
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: smee
+      app.kubernetes.io/instance: tinkerbell
+  namespaceSelector:
+    matchNames:
+    - tinkerbell
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_pod_name]
+      targetLabel: pod
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tinkerbell-tink-server
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tink-server
+      app.kubernetes.io/instance: tinkerbell
+  namespaceSelector:
+    matchNames:
+    - tinkerbell
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_pod_name]
+      targetLabel: pod
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: tinkerbell-hookos
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hookos
+      app.kubernetes.io/instance: tinkerbell
+  namespaceSelector:
+    matchNames:
+    - tinkerbell
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+    relabelings:
+    - sourceLabels: [__meta_kubernetes_pod_name]
+      targetLabel: pod
