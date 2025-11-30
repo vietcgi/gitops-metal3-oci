@@ -271,8 +271,8 @@ helm repo update
 
 # Get the latest stable Cilium version from Helm repo
 # Run in subshell to isolate from pipefail
-CILIUM_VERSION=$(helm search repo cilium/cilium -o json 2>/dev/null | head -c 10000 | grep -o '"version":"[^"]*"' | head -1 | cut -d'"' -f4) || true
-if [ -z "$CILIUM_VERSION" ]; then
+CILIUM_VERSION=$(helm search repo cilium/cilium --devel -o json 2>/dev/null | head -c 10000 | jq -r '.[0].version' 2>/dev/null) || true
+if [ -z "$CILIUM_VERSION" ] || [ "$CILIUM_VERSION" = "null" ]; then
     log "Could not determine latest Cilium version, using fallback 1.18.4"
     CILIUM_VERSION="1.18.4"
 fi
@@ -379,10 +379,27 @@ log "CiliumL2AnnouncementPolicy created"
 # Install Gateway API CRDs (required for Cilium Gateway API)
 # Cilium requires these CRDs to be pre-installed - it doesn't install them automatically
 log "Installing Gateway API CRDs..."
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.2.0/config/crd/standard/gateway.networking.k8s.io_gatewayclasses.yaml
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.2.0/config/crd/standard/gateway.networking.k8s.io_gateways.yaml
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.2.0/config/crd/standard/gateway.networking.k8s.io_httproutes.yaml
-kubectl apply -f https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/v1.2.0/config/crd/standard/gateway.networking.k8s.io_referencegrants.yaml
+
+# Get the latest Gateway API version
+GATEWAY_API_VERSION=""
+if command -v curl &> /dev/null; then
+    # Fetch the latest release tag from GitHub API
+    GATEWAY_API_VERSION=$(curl -s https://api.github.com/repos/kubernetes-sigs/gateway-api/releases/latest | jq -r '.tag_name' 2>/dev/null)
+    if [ -z "$GATEWAY_API_VERSION" ] || [ "$GATEWAY_API_VERSION" = "null" ]; then
+        log "Could not fetch latest Gateway API version, using fallback v1.2.0"
+        GATEWAY_API_VERSION="v1.2.0"
+    fi
+else
+    log "curl not available, using fallback Gateway API version v1.2.0"
+    GATEWAY_API_VERSION="v1.2.0"
+fi
+
+log "Using Gateway API version: $GATEWAY_API_VERSION"
+
+kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_gatewayclasses.yaml"
+kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_gateways.yaml"
+kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_httproutes.yaml"
+kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_referencegrants.yaml"
 log "Gateway API CRDs installed"
 
 # Wait for CRDs to be established
