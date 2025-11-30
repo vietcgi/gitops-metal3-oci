@@ -15,7 +15,6 @@ spec:
     name: flux-system
   path: ./kubernetes/infrastructure
   prune: true
-  wait: true
 ---
 # Layer 2: Post-install configuration
 # ClusterIssuers, etc. that depend on CRDs from Layer 1
@@ -33,7 +32,6 @@ spec:
     name: flux-system
   path: ./kubernetes/infrastructure-config
   prune: true
-  wait: true
   dependsOn:
     - name: infrastructure
 ---
@@ -53,6 +51,5 @@ spec:
     name: flux-system
   path: ./kubernetes/apps
   prune: true
-  wait: true
   dependsOn:
     - name: infrastructure-config
