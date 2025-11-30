@@ -1,16 +1,8 @@
 ---
 # ClusterIssuers for TLS certificates
 #
-# Self-signed issuer works out of the box.
-# Let's Encrypt requires:
-#   1. A valid email address
-#   2. A public domain pointing to your cluster
-#   3. Port 80 accessible for HTTP-01 challenge
-#
-# To enable Let's Encrypt:
-#   1. Update the email addresses below
-#   2. Uncomment the letsencrypt-staging issuer first
-#   3. Test with staging, then switch to letsencrypt-prod
+# Currently using HTTP-01 challenge via Gateway API
+# TODO: Switch to Cloudflare DNS-01 when API token is configured
 ---
 # Self-signed issuer - works immediately, good for internal services
 apiVersion: cert-manager.io/v1
@@ -38,9 +30,8 @@ spec:
               - name: main-gateway
                 namespace: ingress
                 kind: Gateway
-                # Note: sectionName not needed - Cilium routes based on hostname matching
 ---
-# Let's Encrypt PRODUCTION (HTTP-01 for single-domain certs)
+# Let's Encrypt PRODUCTION (HTTP-01 via Gateway API)
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -58,4 +49,3 @@ spec:
               - name: main-gateway
                 namespace: ingress
                 kind: Gateway
-                # Note: sectionName not needed - Cilium routes based on hostname matching

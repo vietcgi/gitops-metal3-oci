@@ -1,59 +1,20 @@
+# ServiceMonitor for Tinkerbell unified service
+# The new Tinkerbell chart deploys all components in a single pod
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: tinkerbell-smee
+  name: tinkerbell
   namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
 spec:
   selector:
     matchLabels:
-      app: tinkerbell  # Based on actual pod labels, main tinkerbell pod has this
+      app.kubernetes.io/name: tinkerbell
   namespaceSelector:
     matchNames:
-    - tinkerbell
+      - tink-system
   endpoints:
-  - port: http
-    interval: 30s
-    path: /metrics
-    relabelings:
-    - sourceLabels: [__meta_kubernetes_pod_name]
-      targetLabel: pod
----
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: tinkerbell-tink-server
-  namespace: monitoring
-spec:
-  selector:
-    matchLabels:
-      app: tinkerbell  # Based on actual pod labels
-  namespaceSelector:
-    matchNames:
-    - tinkerbell
-  endpoints:
-  - port: http
-    interval: 30s
-    path: /metrics
-    relabelings:
-    - sourceLabels: [__meta_kubernetes_pod_name]
-      targetLabel: pod
----
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: tinkerbell-hookos
-  namespace: monitoring
-spec:
-  selector:
-    matchLabels:
-      app: hookos  # Based on actual pod labels: hookos-569c8c9df4-jdnwq has app: hookos
-  namespaceSelector:
-    matchNames:
-    - tinkerbell
-  endpoints:
-  - port: http
-    interval: 30s
-    path: /metrics
-    relabelings:
-    - sourceLabels: [__meta_kubernetes_pod_name]
-      targetLabel: pod
+    - port: httpSmee
+      interval: 30s
+      path: /metrics

@@ -6,8 +6,8 @@ metadata:
   name: ingress
 ---
 # Shared Gateway for all services
-# Each service adds its own Certificate and HTTPS listener
-# HTTP listener handles ACME HTTP-01 challenges automatically
+# TLS certificates via Let's Encrypt with HTTP-01 challenge
+# HTTP listener handles redirects to HTTPS and ACME challenges
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
@@ -18,36 +18,41 @@ metadata:
 spec:
   gatewayClassName: cilium
   listeners:
-    # HTTP listener - for ACME HTTP-01 challenges and plain HTTP (generic)
+    # HTTP listener - for HTTP→HTTPS redirects
     - name: http
       protocol: HTTP
       port: 80
       allowedRoutes:
         namespaces:
           from: All
-    # HTTP listener for Grafana - required for cert-manager HTTP-01 challenges
-    # The ACME solver HTTPRoute attaches here due to hostname matching
-    - name: http-grafana
-      protocol: HTTP
-      port: 80
+    # HTTPS listener for Grafana
+    - name: https-grafana
+      protocol: HTTPS
+      port: 443
       hostname: grafana.qualityspace.com
       allowedRoutes:
         namespaces:
           from: All
-    # HTTPS listener for Grafana
-    - allowedRoutes:
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: grafana-tls
+    # HTTPS listener for Tinkerbell
+    # Used for iPXE chainloading, HookOS downloads, and API
+    - name: https-tinkerbell
+      protocol: HTTPS
+      port: 443
+      hostname: tinkerbell.qualityspace.com
+      allowedRoutes:
         namespaces:
           from: All
-      hostname: grafana.qualityspace.com
-      name: https-grafana
-      port: 443
-      protocol: HTTPS
       tls:
-        certificateRefs:
-        - group: ""
-          kind: Secret
-          name: grafana-tls
         mode: Terminate
+        certificateRefs:
+          - name: tinkerbell-tls
+            namespace: tink-system
     # Harbor listener disabled - suspended due to ARM64 incompatibility
     # Re-enable when Harbor is running on x86_64
     # - name: https-harbor

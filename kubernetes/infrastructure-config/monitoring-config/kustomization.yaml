@@ -6,4 +6,3 @@ resources:
   - tinkerbell-alerting-rules.yaml
   - tinkerbell-service-monitors.yaml
   - bare-metal-health.yaml
-  - tinkerbell-metrics.yaml

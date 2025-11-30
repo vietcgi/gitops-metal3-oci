@@ -1,143 +1,193 @@
 ---
+# Tinkerbell Namespace
+# Using tink-system as per Tinkerbell convention
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: tinkerbell
+  name: tink-system
+  labels:
+    app.kubernetes.io/name: tinkerbell
 ---
 # Tinkerbell Helm Release (unified chart)
 #
-# The modern Tinkerbell chart bundles all components into a single deployment:
-# - Smee (DHCP/PXE/HTTP boot server)
-# - Tink Server & Controller (workflow engine)
-# - Rufio (BMC controller)
-# - Tootles (metadata service)
-# - Secondstar (SSH provisioning)
+# Architecture: iPXE chainloading over HTTPS
+# - Control plane on OCI cloud
+# - Bare metal at home lab / colo sites
+# - Local DHCP points to https://tinkerbell.qualityspace.com/auto.ipxe
+# - Rufio controls BMC (iDRAC/IPMI) via network
 #
-# Chart source: oci://ghcr.io/tinkerbell/charts/tinkerbell
+# Components enabled:
+# - Smee: iPXE server (DHCP disabled - sites have their own)
+# - Tink Server & Controller: Workflow engine
+# - Rufio: BMC controller for iDRAC/Supermicro IPMI
+# - Tootles: Artifact server for HookOS
 #
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: tinkerbell
-  namespace: tinkerbell
+  namespace: tink-system
 spec:
   interval: 1h
   chart:
     spec:
       chart: tinkerbell
-      version: "v0.21.0"
+      version: "0.21.0"
       sourceRef:
         kind: HelmRepository
         name: tinkerbell
         namespace: flux-system
   values:
-    # Required: Pod CIDR for trusted proxies (K3s default, but configurable)
-    # This should match your cluster's Pod CIDR
-    trustedProxies: "10.42.0.0/16"
+    # Public hostname for services
+    publicIP: "tinkerbell.qualityspace.com"
 
-    # HookOS artifacts served via ingress
-    artifactsFileServer: "https://tinkerbell.example.com/hook"  # This should be changed to your actual domain
+    # Trusted proxies (Cilium pod CIDR)
+    trustedProxies:
+      - "10.42.0.0/16"
 
+    # HookOS artifacts URL
+    artifactsFileServer: "https://tinkerbell.qualityspace.com"
+
+    # Deployment configuration
     deployment:
       replicas: 1
+      # Don't use hostNetwork - we're behind Gateway API
       hostNetwork: false
+
+      # Feature flags
+      envs:
+        globals:
+          # Enable all required components
+          enableSmee: true
+          enableTinkServer: true
+          enableTinkController: true
+          enableRufioController: true
+          enableTootles: true
+          # Disable SSH bastion (secondstar)
+          enableSecondstar: false
+
+        smee:
+          # Disable DHCP - each site has its own DHCP server
+          # Local DHCP configured to chainload iPXE from this URL
+          dhcpMode: "disabled"
+
       resources:
         requests:
           cpu: 100m
-          memory: 128Mi
-        limits:
-          cpu: 500m
           memory: 256Mi
+        limits:
+          cpu: 1000m
+          memory: 512Mi
 
-      envs:
-        globals:
-          backend: "kube"
-          enableCRDMigrations: true
-          enableRufioController: false  # No BMC in cloud
-          enableSecondstar: true        # SSH provisioning
-          enableSmee: true              # DHCP/PXE server
-          enableTootles: true           # Metadata service
-          enableTinkServer: true
-          enableTinkController: true
-          logLevel: 0
-
-        smee:
-          # HTTP-only mode for cloud environments (no local DHCP broadcast)
-          dhcpEnabled: false
-          ipxeHttpScriptEnabled: true
-          ipxeHttpBinaryEnabled: true
-          tftpServerEnabled: false
-          syslogEnabled: false
-          isoEnabled: true
-
-    # Service configuration (ClusterIP - traffic goes through ingress)
+    # Service configuration - use ClusterIP since we're behind Gateway API
     service:
-      enabled: true
       type: ClusterIP
 
-    # Hook files (HookOS artifacts)
-    hookFiles:
-      enabled: true
-      download:
-        enabled: true
-        url: "https://github.com/tinkerbell/hook/releases/download/v0.11.1"
-
-    # HookOS service (ClusterIP - traffic goes through ingress)
+    # Optional components
     optional:
+      # HookOS - in-memory provisioning OS
       hookos:
-        service:
-          type: ClusterIP
-
-    # Health checks
-    healthChecks:
-      enabled: true
-      livenessProbe:
-        initialDelaySeconds: 30
-        periodSeconds: 10
-      readinessProbe:
-        initialDelaySeconds: 5
-        periodSeconds: 5
+        enabled: true
+        downloadURL: "https://github.com/tinkerbell/hook/releases/download/v0.11.1"
+      # Disable kubevip - using Cilium L2 announcements
+      kubevip:
+        enabled: false
+---
+# TLS Certificate for Tinkerbell
+# Required for secure iPXE boot and API access
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: tinkerbell-tls
+  namespace: tink-system
+spec:
+  secretName: tinkerbell-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - tinkerbell.qualityspace.com
 ---
 # HTTPRoute for Tinkerbell services
-# References the shared main-gateway in the ingress namespace
+# Routes traffic from main-gateway to Tinkerbell
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
   name: tinkerbell-route
-  namespace: tinkerbell
+  namespace: tink-system
 spec:
   parentRefs:
     - name: main-gateway
       namespace: ingress
+      sectionName: https-tinkerbell
   hostnames:
-    - tinkerbell.example.com  # This should be changed to your actual domain
+    - tinkerbell.qualityspace.com
   rules:
-    # HookOS artifacts at /hook path
+    # iPXE auto script - this is what DHCP points to
+    - matches:
+        - path:
+            type: Exact
+            value: /auto.ipxe
+      backendRefs:
+        - name: tinkerbell
+          port: 7171
+    # Smee HTTP endpoints
     - matches:
         - path:
             type: PathPrefix
-            value: /hook
+            value: /ipxe
       backendRefs:
-        - name: hookos
-          port: 7173
-    # Tinkerbell API at root path
+        - name: tinkerbell
+          port: 7171
+    # HookOS kernel and initrd (Tootles artifact server)
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /tootles
+      backendRefs:
+        - name: tinkerbell
+          port: 7172
+    # Tink gRPC API (catch-all)
     - matches:
         - path:
             type: PathPrefix
             value: /
       backendRefs:
         - name: tinkerbell
-          port: 7171
-# ServiceMonitor moved to infrastructure-config/monitoring-config/tinkerbell-metrics.yaml (depends on kube-prometheus-stack CRDs)
+          port: 42113
 ---
-# PodDisruptionBudget to ensure availability
+# HTTP Route for Tinkerbell - redirects HTTP to HTTPS
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: tinkerbell-http
+  namespace: tink-system
+spec:
+  parentRefs:
+    - name: main-gateway
+      namespace: ingress
+      sectionName: http
+  hostnames:
+    - tinkerbell.qualityspace.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+---
+# PodDisruptionBudget for availability
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: tinkerbell-pdb
-  namespace: tinkerbell
+  namespace: tink-system
 spec:
   minAvailable: 1
   selector:
     matchLabels:
-      app.kubernetes.io/instance: tinkerbell
+      app.kubernetes.io/name: tinkerbell
