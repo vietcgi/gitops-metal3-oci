@@ -39,6 +39,9 @@ spec:
       enabled: true
       hostNetwork:
         enabled: true
+      # Enable appProtocol field support for backend protocol selection (GEP-1911)
+      # Required for routing to HTTP/1.1-only backends (like nginx serving HookOS)
+      enableAppProtocol: true
 
     # Envoy proxy settings - required for privileged port binding
     envoy:
