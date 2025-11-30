@@ -477,62 +477,31 @@ spec:
   timeout: 10m
 EOF
 
-    log "Waiting for Flux controllers..."
+    log "Waiting for Flux controllers (parallel)..."
 
-    # Check which Flux controllers exist (some may not be installed by default)
-    flux_controllers=("source-controller" "kustomize-controller" "helm-controller" "notification-controller")
-
-    # Add image-automation-controller if it exists
-    if kubectl get deployment image-automation-controller -n flux-system &>/dev/null; then
-        flux_controllers+=("image-automation-controller")
-        log "Found image-automation-controller, including in wait list"
-    fi
-
-    # Add image-reflector-controller if it exists
-    if kubectl get deployment image-reflector-controller -n flux-system &>/dev/null; then
-        flux_controllers+=("image-reflector-controller")
-        log "Found image-reflector-controller, including in wait list"
-    fi
-
-    # Wait for all available Flux controllers with proper error handling
-    all_controllers_ready=true
-    for controller in "${flux_controllers[@]}"; do
-        log "Waiting for $controller to be available..."
-        if ! kubectl wait --for=condition=available --timeout=300s deployment/$controller -n flux-system 2>/dev/null; then
-            log "ERROR: $controller failed to become available within timeout"
-            all_controllers_ready=false
-        else
-            log "✓ $controller is ready"
-        fi
-    done
-
-    if [ "$all_controllers_ready" != true ]; then
-        log "ERROR: Some Flux controllers failed to start. Check deployment status with: kubectl get deployments -n flux-system"
+    # Wait for all core controllers in parallel with a single command
+    if ! kubectl wait --for=condition=available --timeout=120s \
+        deployment/source-controller \
+        deployment/kustomize-controller \
+        deployment/helm-controller \
+        deployment/notification-controller \
+        -n flux-system; then
+        log "ERROR: Flux controllers failed to start within timeout"
+        kubectl get deployments -n flux-system
         exit 1
     fi
-
     log "✓ All Flux controllers are ready"
 
-    log "Triggering initial reconciliation..."
-    sleep 5
+    log "Triggering initial reconciliation (async)..."
 
-    # Reconcile Git source with error handling
-    if ! flux reconcile source git flux-system; then
-        log "ERROR: Failed to reconcile Git source"
-        exit 1
-    fi
-    log "✓ Git source reconciliation triggered"
+    # Trigger reconciliation without blocking - Flux handles it asynchronously
+    # The GitOps controllers will continuously reconcile on their interval
+    kubectl annotate --overwrite gitrepository/flux-system -n flux-system \
+        reconcile.fluxcd.io/requestedAt="$(date +%s)" || true
+    kubectl annotate --overwrite kustomization/flux-system -n flux-system \
+        reconcile.fluxcd.io/requestedAt="$(date +%s)" || true
 
-    # Reconcile root kustomization with error handling
-    if ! flux reconcile kustomization flux-system; then
-        log "ERROR: Failed to reconcile root kustomization"
-        exit 1
-    fi
-    log "✓ Root kustomization reconciliation triggered"
-
-    # Wait briefly for reconciliation to start before reporting status
-    sleep 10
-    log "Flux deployments initiated successfully"
+    log "✓ Reconciliation triggered (Flux will continue in background)"
 fi
 
 log "Flux is ready"
