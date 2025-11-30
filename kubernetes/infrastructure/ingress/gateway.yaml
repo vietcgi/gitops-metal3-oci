@@ -24,21 +24,19 @@ spec:
         namespaces:
           from: All
     # HTTPS listener for Grafana
-    # Temporarily disabled - Let's Encrypt rate limited until 2025-12-01 06:13:45 UTC
-    # Re-enable after rate limit resets
-    # - name: https-grafana
-    #   protocol: HTTPS
-    #   port: 443
-    #   hostname: grafana.qualityspace.com
-    #   allowedRoutes:
-    #     namespaces:
-    #       from: All
-    #   tls:
-    #     mode: Terminate
-    #     certificateRefs:
-    #       - group: ""
-    #         kind: Secret
-    #         name: grafana-tls
+    - name: https-grafana
+      protocol: HTTPS
+      port: 443
+      hostname: grafana.qualityspace.com
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: grafana-tls
     # HTTPS listener for Tinkerbell
     # Used for iPXE chainloading, HookOS downloads, and API
     - name: https-tinkerbell
