@@ -158,10 +158,12 @@ fi
 
 log "Using Gateway API version: $GATEWAY_API_VERSION"
 
+# Standard CRDs
 kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_gatewayclasses.yaml"
 kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_gateways.yaml"
 kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_httproutes.yaml"
 kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_referencegrants.yaml"
+kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_grpcroutes.yaml"
 log "Gateway API CRDs installed"
 
 # Wait for CRDs to be established
@@ -169,6 +171,7 @@ log "Waiting for Gateway API CRDs to be established..."
 kubectl wait --for condition=established --timeout=60s crd/gatewayclasses.gateway.networking.k8s.io
 kubectl wait --for condition=established --timeout=60s crd/gateways.gateway.networking.k8s.io
 kubectl wait --for condition=established --timeout=60s crd/httproutes.gateway.networking.k8s.io
+kubectl wait --for condition=established --timeout=60s crd/grpcroutes.gateway.networking.k8s.io
 log "Gateway API CRDs are ready"
 
 # Install Cilium CNI via Helm
