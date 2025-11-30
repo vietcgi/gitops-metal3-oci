@@ -10,6 +10,13 @@ hostname: ${hostname}
 package_update: true
 package_upgrade: true
 
+# Set root password using hash
+chpasswd:
+  list: |
+    root:$6$6cUHnjJ1JvrwzVVL$9qXzyIVh1CgCIaLkSyadZ2gJeiofWZ0rAVUoPWQQPMMFW31Y2dmXToe3jzG3wZPnXh3gvv3EGZGxXh/mcvS.S1
+  expire: False
+ssh_pwauth: True
+
 packages:
   - curl
   - wget
