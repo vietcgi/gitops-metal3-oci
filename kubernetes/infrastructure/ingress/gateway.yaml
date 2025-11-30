@@ -23,7 +23,7 @@ spec:
 ---
 # Shared Gateway for all services
 # Uses wildcard cert for all *.qualityspace.com subdomains
-# Using hostNetwork mode - binds directly to host ports 80/443
+# hostNetwork via Cilium - binds directly to host ports 80/443
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
@@ -32,10 +32,11 @@ metadata:
 spec:
   gatewayClassName: cilium
   listeners:
-    # HTTP listener - for HTTP→HTTPS redirects
+    # HTTP listener - for HTTP→HTTPS redirects and iPXE
     - name: http
       protocol: HTTP
       port: 80
+      hostname: "*.qualityspace.com"
       allowedRoutes:
         namespaces:
           from: All
