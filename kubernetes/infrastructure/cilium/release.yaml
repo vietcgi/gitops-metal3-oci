@@ -38,7 +38,7 @@ spec:
     gatewayAPI:
       enabled: true
       hostNetwork:
-        enabled: true
+        enabled: false
 
     # Envoy proxy settings - required for privileged port binding
     envoy:
@@ -55,7 +55,7 @@ spec:
 
     # Enable L2 announcements for LoadBalancer services (bare metal)
     l2announcements:
-      enabled: false
+      enabled: true
 
     # Enable external IPs
     externalIPs:
