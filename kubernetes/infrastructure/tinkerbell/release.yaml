@@ -143,14 +143,21 @@ spec:
       backendRefs:
         - name: tinkerbell
           port: 7171
-    # HookOS kernel and initrd (Tootles artifact server)
+    # HookOS kernel and initrd files (served by nginx)
     - matches:
         - path:
             type: PathPrefix
-            value: /tootles
+            value: /vmlinuz
       backendRefs:
-        - name: tinkerbell
-          port: 7172
+        - name: hookos
+          port: 7173
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /initramfs
+      backendRefs:
+        - name: hookos
+          port: 7173
     # Tink gRPC API (catch-all)
     - matches:
         - path:
