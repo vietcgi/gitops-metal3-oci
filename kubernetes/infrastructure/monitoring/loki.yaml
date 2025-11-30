@@ -37,7 +37,7 @@ spec:
         enabled: true
         size: 10Gi
         storageClass: local-path
-    # Remove conflicting configurations for other deployment modes
+    # Disable all other deployment modes to prevent conflicts
     gateway:
       enabled: false
     read:
@@ -46,9 +46,16 @@ spec:
       replicas: 0
     backend:
       replicas: 0
+    distributor:
+      replicas: 0
+    ingester:
+      replicas: 0
+    querier:
+      replicas: 0
+    queryFrontend:
+      replicas: 0
+    tableManager:
+      replicas: 0
     monitoring:
       serviceMonitor:
         enabled: true
-    # Make sure other deployment modes are disabled
-    simpleScalable:
-      enabled: false
