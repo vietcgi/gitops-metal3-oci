@@ -72,6 +72,9 @@ spec:
           # Disable DHCP - each site has its own DHCP server
           # Local DHCP configured to chainload iPXE from this URL
           dhcpEnabled: false
+          # Enable HTTP iPXE script serving at /auto.ipxe
+          httpIpxeScriptEnabled: true
+          httpIpxeScriptUrl: "https://tinkerbell.qualityspace.com"
 
       resources:
         requests:
