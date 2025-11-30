@@ -139,6 +139,39 @@ if [ -z "$CILIUM_VERSION" ] || [ "$CILIUM_VERSION" = "null" ]; then
 fi
 log "Using Cilium version: $CILIUM_VERSION"
 
+# Install Gateway API CRDs BEFORE Cilium (required for Cilium's gateway controller to initialize)
+# Cilium requires these CRDs to be pre-installed - it doesn't install them automatically
+log "Installing Gateway API CRDs..."
+
+# Get the latest Gateway API version
+GATEWAY_API_VERSION=""
+if command -v curl &> /dev/null; then
+    # Fetch the latest release tag from GitHub API
+    GATEWAY_API_VERSION=$(curl -s https://api.github.com/repos/kubernetes-sigs/gateway-api/releases/latest | jq -r '.tag_name' 2>/dev/null)
+    if [ -z "$GATEWAY_API_VERSION" ] || [ "$GATEWAY_API_VERSION" = "null" ]; then
+        log "Could not fetch latest Gateway API version, using fallback v1.2.0"
+        GATEWAY_API_VERSION="v1.2.0"
+    fi
+else
+    log "curl not available, using fallback Gateway API version v1.2.0"
+    GATEWAY_API_VERSION="v1.2.0"
+fi
+
+log "Using Gateway API version: $GATEWAY_API_VERSION"
+
+kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_gatewayclasses.yaml"
+kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_gateways.yaml"
+kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_httproutes.yaml"
+kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_referencegrants.yaml"
+log "Gateway API CRDs installed"
+
+# Wait for CRDs to be established
+log "Waiting for Gateway API CRDs to be established..."
+kubectl wait --for condition=established --timeout=60s crd/gatewayclasses.gateway.networking.k8s.io
+kubectl wait --for condition=established --timeout=60s crd/gateways.gateway.networking.k8s.io
+kubectl wait --for condition=established --timeout=60s crd/httproutes.gateway.networking.k8s.io
+log "Gateway API CRDs are ready"
+
 # Install Cilium CNI via Helm
 # Configuration matches kubernetes/infrastructure/cilium/release.yaml EXACTLY
 if ! kubectl get pods -n kube-system -l app.kubernetes.io/name=cilium-agent --no-headers 2>/dev/null | grep -q Running; then
@@ -237,39 +270,7 @@ spec:
 EOF
 log "CiliumL2AnnouncementPolicy created"
 
-# Install Gateway API CRDs (required for Cilium Gateway API)
-# Cilium requires these CRDs to be pre-installed - it doesn't install them automatically
-log "Installing Gateway API CRDs..."
-
-# Get the latest Gateway API version
-GATEWAY_API_VERSION=""
-if command -v curl &> /dev/null; then
-    # Fetch the latest release tag from GitHub API
-    GATEWAY_API_VERSION=$(curl -s https://api.github.com/repos/kubernetes-sigs/gateway-api/releases/latest | jq -r '.tag_name' 2>/dev/null)
-    if [ -z "$GATEWAY_API_VERSION" ] || [ "$GATEWAY_API_VERSION" = "null" ]; then
-        log "Could not fetch latest Gateway API version, using fallback v1.2.0"
-        GATEWAY_API_VERSION="v1.2.0"
-    fi
-else
-    log "curl not available, using fallback Gateway API version v1.2.0"
-    GATEWAY_API_VERSION="v1.2.0"
-fi
-
-log "Using Gateway API version: $GATEWAY_API_VERSION"
-
-kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_gatewayclasses.yaml"
-kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_gateways.yaml"
-kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_httproutes.yaml"
-kubectl apply -f "https://raw.githubusercontent.com/kubernetes-sigs/gateway-api/$GATEWAY_API_VERSION/config/crd/standard/gateway.networking.k8s.io_referencegrants.yaml"
-log "Gateway API CRDs installed"
-
-# Wait for CRDs to be established
-log "Waiting for Gateway API CRDs to be established..."
-kubectl wait --for condition=established --timeout=60s crd/gatewayclasses.gateway.networking.k8s.io
-kubectl wait --for condition=established --timeout=60s crd/gateways.gateway.networking.k8s.io
-kubectl wait --for condition=established --timeout=60s crd/httproutes.gateway.networking.k8s.io
-log "Gateway API CRDs are ready"
-
+# Create Cilium GatewayClass (CRDs were installed before Cilium)
 log "Creating Cilium GatewayClass..."
 cat <<EOF | kubectl apply -f -
 apiVersion: gateway.networking.k8s.io/v1
