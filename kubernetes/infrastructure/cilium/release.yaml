@@ -42,6 +42,8 @@ spec:
       # Enable appProtocol field support for backend protocol selection (GEP-1911)
       # Required for routing to HTTP/1.1-only backends (like nginx serving HookOS)
       enableAppProtocol: true
+      # Enable ALPN for gRPC over HTTPS (required for GRPCRoute with TLS termination)
+      enableAlpn: true
 
     # Envoy proxy settings - required for privileged port binding
     envoy:
