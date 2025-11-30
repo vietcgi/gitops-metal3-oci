@@ -47,7 +47,7 @@ spec:
       - "10.42.0.0/16"
 
     # HookOS artifacts URL - served via NodePort (Gateway has HTTP/2 issues with nginx)
-    artifactsFileServer: "http://170.9.8.103:30080"
+    artifactsFileServer: "http://170.9.8.103:30897"
 
     # Deployment configuration
     deployment:
