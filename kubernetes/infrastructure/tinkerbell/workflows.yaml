@@ -1,0 +1,13 @@
+---
+# Workflow for colo-server-01 Ubuntu 24.04 installation
+apiVersion: tinkerbell.org/v1alpha1
+kind: Workflow
+metadata:
+  name: colo-server-01-ubuntu
+  namespace: tink-system
+spec:
+  templateRef: ubuntu-2404
+  hardwareRef: colo-server-01
+  hardwareMap:
+    device_1: 00:0c:29:73:03:4b
+    hostname: colo-server-01

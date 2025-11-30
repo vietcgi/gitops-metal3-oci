@@ -3,3 +3,5 @@ kind: Kustomization
 resources:
   - release.yaml
   - reference-grant.yaml
+  - templates.yaml
+  - workflows.yaml
