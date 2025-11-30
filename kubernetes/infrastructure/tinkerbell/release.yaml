@@ -183,7 +183,7 @@ spec:
         - name: tinkerbell
           port: 42113
 ---
-# HTTP Route for Tinkerbell - redirects HTTP to HTTPS
+# HTTP Route for Tinkerbell iPXE endpoints (no redirect for iPXE)
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -197,6 +197,29 @@ spec:
   hostnames:
     - tinkerbell.qualityspace.com
   rules:
+    # iPXE auto script - serve directly over HTTP (iPXE TLS issues)
+    - matches:
+        - path:
+            type: Exact
+            value: /auto.ipxe
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplaceFullPath
+              replaceFullPath: /ipxe/script/auto.ipxe
+      backendRefs:
+        - name: tinkerbell
+          port: 7171
+    # iPXE endpoints - serve directly over HTTP
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /ipxe
+      backendRefs:
+        - name: tinkerbell
+          port: 7171
+    # Everything else redirects to HTTPS
     - matches:
         - path:
             type: PathPrefix
