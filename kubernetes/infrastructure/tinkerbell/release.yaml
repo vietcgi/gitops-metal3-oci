@@ -262,16 +262,7 @@ spec:
       backendRefs:
         - name: tinkerbell
           port: 7171
-    # Everything else redirects to HTTPS
-    - matches:
-        - path:
-            type: PathPrefix
-            value: /
-      filters:
-        - type: RequestRedirect
-          requestRedirect:
-            scheme: https
-            statusCode: 301
+    # Note: No catch-all redirect - gRPC traffic needs to reach GRPCRoute on HTTP
 ---
 # PodDisruptionBudget for availability
 apiVersion: policy/v1
