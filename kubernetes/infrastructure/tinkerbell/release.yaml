@@ -38,10 +38,9 @@ spec:
         name: tinkerbell
         namespace: flux-system
   values:
-    # Public address for HookOS to connect back to Tinkerbell
-    # Must be reachable from bare metal servers during provisioning
-    # Using domain name since gRPC is exposed via Gateway API on port 80
-    publicIP: "tinkerbell.qualityspace.com"
+    # Public IP for syslog and other services
+    # Note: gRPC endpoint is overridden via ipxeHttpScriptExtraKernelArgs
+    publicIP: "170.9.8.103"
 
     # Trusted proxies (Cilium pod CIDR)
     trustedProxies:
@@ -79,8 +78,9 @@ spec:
           # gRPC endpoint for HookOS tink-worker to connect to
           # Using HTTP:80 due to Cilium ALPN bug (https://github.com/cilium/cilium/issues/30794)
           # GRPCRoute only works on HTTP listener, not HTTPS
-          ipxeScriptTinkServerAddrPort: "tinkerbell.qualityspace.com:80"
-          ipxeScriptTinkServerUseTLS: false
+          # Override grpc_authority via extra kernel args since publicIP must be an IP
+          ipxeHttpScriptExtraKernelArgs:
+            - "grpc_authority=tinkerbell.qualityspace.com:80"
 
       resources:
         requests:
