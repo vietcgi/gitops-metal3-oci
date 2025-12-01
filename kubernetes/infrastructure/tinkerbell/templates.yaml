@@ -20,14 +20,14 @@ spec:
           - /lib/firmware:/lib/firmware:ro
         actions:
           - name: stream-ubuntu-image
-            image: quay.io/tinkerbell/actions/image2disk:v1.0.0
+            image: quay.io/tinkerbell/actions/image2disk:latest
             timeout: 600
             environment:
               DEST_DISK: /dev/sda
               IMG_URL: https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img
               COMPRESSED: true
           - name: grow-partition
-            image: quay.io/tinkerbell/actions/cexec:v1.0.0
+            image: quay.io/tinkerbell/actions/cexec:latest
             timeout: 90
             environment:
               BLOCK_DEVICE: /dev/sda1
@@ -35,7 +35,7 @@ spec:
               CHROOT: "n"
               CMD_LINE: growpart /dev/sda 1 && resize2fs /dev/sda1
           - name: write-netplan
-            image: quay.io/tinkerbell/actions/writefile:v1.0.0
+            image: quay.io/tinkerbell/actions/writefile:latest
             timeout: 90
             environment:
               DEST_DISK: /dev/sda1
@@ -61,7 +61,7 @@ spec:
               GID: "0"
               MODE: "0644"
           - name: write-cloud-init-meta
-            image: quay.io/tinkerbell/actions/writefile:v1.0.0
+            image: quay.io/tinkerbell/actions/writefile:latest
             timeout: 90
             environment:
               DEST_DISK: /dev/sda1
@@ -75,7 +75,7 @@ spec:
               MODE: "0644"
               DIRMODE: "0755"
           - name: write-cloud-init-user
-            image: quay.io/tinkerbell/actions/writefile:v1.0.0
+            image: quay.io/tinkerbell/actions/writefile:latest
             timeout: 90
             environment:
               DEST_DISK: /dev/sda1
@@ -112,7 +112,7 @@ spec:
               MODE: "0644"
               DIRMODE: "0755"
           - name: reboot
-            image: quay.io/tinkerbell/actions/kexec:v1.0.0
+            image: quay.io/tinkerbell/actions/kexec:latest
             timeout: 90
             pid: host
             environment:
