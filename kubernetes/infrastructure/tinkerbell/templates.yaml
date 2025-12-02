@@ -20,7 +20,7 @@ spec:
           - /lib/firmware:/lib/firmware:ro
         actions:
           - name: stream-ubuntu-image
-            image: ghcr.io/tinkerbell/actions/image2disk:v1.0.0
+            image: quay.io/tinkerbell/actions/image2disk:latest
             timeout: 300
             environment:
               DEST_DISK: /dev/sda
@@ -41,7 +41,7 @@ spec:
             pid: host
             command: ["/usr/bin/nsenter", "-t", "1", "-m", "-u", "-i", "-n", "--", "/bin/sh", "-c", "mount /dev/sda1 /mnt && rm -rf /mnt/var/lib/cloud/instances/* /mnt/var/lib/cloud/instance /mnt/var/lib/cloud/data/* 2>/dev/null; rm -f /mnt/etc/machine-id && echo 'uninitialized' > /mnt/etc/machine-id && umount /mnt"]
           - name: write-netplan
-            image: ghcr.io/tinkerbell/actions/writefile:v1.0.0
+            image: quay.io/tinkerbell/actions/writefile:latest
             timeout: 90
             environment:
               DEST_DISK: /dev/sda1
@@ -68,7 +68,7 @@ spec:
               MODE: "0644"
               DIRMODE: "0755"
           - name: write-cloud-init-meta
-            image: ghcr.io/tinkerbell/actions/writefile:v1.0.0
+            image: quay.io/tinkerbell/actions/writefile:latest
             timeout: 90
             environment:
               DEST_DISK: /dev/sda1
@@ -82,7 +82,7 @@ spec:
               MODE: "0644"
               DIRMODE: "0755"
           - name: write-cloud-init-user
-            image: ghcr.io/tinkerbell/actions/writefile:v1.0.0
+            image: quay.io/tinkerbell/actions/writefile:latest
             timeout: 90
             environment:
               DEST_DISK: /dev/sda1
@@ -122,7 +122,7 @@ spec:
           # kexec loads the new kernel directly, bypassing PXE boot entirely
           # This avoids the allowPXE issue since there's no BIOS reboot
           - name: kexec-into-os
-            image: ghcr.io/tinkerbell/actions/kexec:v1.0.0
+            image: quay.io/tinkerbell/actions/kexec:latest
             timeout: 90
             pid: host
             environment:
@@ -153,7 +153,7 @@ spec:
           - /lib/firmware:/lib/firmware:ro
         actions:
           - name: stream-ubuntu-image
-            image: ghcr.io/tinkerbell/actions/image2disk:v1.0.0
+            image: quay.io/tinkerbell/actions/image2disk:latest
             timeout: 600
             environment:
               DEST_DISK: /dev/sda
@@ -173,7 +173,7 @@ spec:
             pid: host
             command: ["/usr/bin/nsenter", "-t", "1", "-m", "-u", "-i", "-n", "--", "/bin/sh", "-c", "mount /dev/sda1 /mnt && rm -rf /mnt/var/lib/cloud/instances/* /mnt/var/lib/cloud/instance /mnt/var/lib/cloud/data/* 2>/dev/null; rm -f /mnt/etc/machine-id && echo 'uninitialized' > /mnt/etc/machine-id && umount /mnt"]
           - name: write-netplan
-            image: ghcr.io/tinkerbell/actions/writefile:v1.0.0
+            image: quay.io/tinkerbell/actions/writefile:latest
             timeout: 90
             environment:
               DEST_DISK: /dev/sda1
@@ -200,7 +200,7 @@ spec:
               MODE: "0644"
               DIRMODE: "0755"
           - name: write-cloud-init-meta
-            image: ghcr.io/tinkerbell/actions/writefile:v1.0.0
+            image: quay.io/tinkerbell/actions/writefile:latest
             timeout: 90
             environment:
               DEST_DISK: /dev/sda1
@@ -214,7 +214,7 @@ spec:
               MODE: "0644"
               DIRMODE: "0755"
           - name: write-cloud-init-user
-            image: ghcr.io/tinkerbell/actions/writefile:v1.0.0
+            image: quay.io/tinkerbell/actions/writefile:latest
             timeout: 90
             environment:
               DEST_DISK: /dev/sda1
@@ -254,7 +254,7 @@ spec:
           # kexec loads the new kernel directly, bypassing PXE boot entirely
           # This avoids the allowPXE issue since there's no BIOS reboot
           - name: kexec-into-os
-            image: ghcr.io/tinkerbell/actions/kexec:v1.0.0
+            image: quay.io/tinkerbell/actions/kexec:latest
             timeout: 90
             pid: host
             environment:
