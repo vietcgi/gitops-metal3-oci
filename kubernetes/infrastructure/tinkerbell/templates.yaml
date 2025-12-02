@@ -113,12 +113,11 @@ spec:
               MODE: "0644"
               DIRMODE: "0755"
           - name: reboot
-            image: quay.io/tinkerbell/actions/kexec:latest
+            image: ghcr.io/tinkerbell/actions/reboot:v1.0.1
             timeout: 90
             pid: host
-            environment:
-              BLOCK_DEVICE: /dev/sda1
-              FS_TYPE: ext4
+            volumes:
+              - /var/run/dbus:/var/run/dbus
 ---
 # Ubuntu 24.04 LTS Installation Template for anvil (Dell R610)
 # Uses nsenter to refresh partition table after image2disk (fixes mount failures)
@@ -232,9 +231,8 @@ spec:
               MODE: "0644"
               DIRMODE: "0755"
           - name: reboot
-            image: quay.io/tinkerbell/actions/kexec:latest
+            image: ghcr.io/tinkerbell/actions/reboot:v1.0.1
             timeout: 90
             pid: host
-            environment:
-              BLOCK_DEVICE: /dev/sda1
-              FS_TYPE: ext4
+            volumes:
+              - /var/run/dbus:/var/run/dbus
