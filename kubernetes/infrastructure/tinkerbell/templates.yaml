@@ -121,14 +121,13 @@ spec:
               GID: "0"
               MODE: "0644"
               DIRMODE: "0755"
-          # Install GRUB bootloader using cexec (chroot) - this reports SUCCESS to workflow
-          # Boot partition is sda16 on Ubuntu cloud images
+          # Install GRUB bootloader using cexec (chroot into root partition sda1)
           - name: install-grub
             image: quay.io/tinkerbell/actions/cexec:latest
             timeout: 120
             pid: host
             environment:
-              BLOCK_DEVICE: /dev/sda16
+              BLOCK_DEVICE: /dev/sda1
               FS_TYPE: ext4
               CHROOT: "y"
               DEFAULT_INTERPRETER: "/bin/bash -c"
@@ -262,14 +261,13 @@ spec:
               GID: "0"
               MODE: "0644"
               DIRMODE: "0755"
-          # Install GRUB bootloader using cexec (chroot) - this reports SUCCESS to workflow
-          # Boot partition is sda16 on Ubuntu cloud images
+          # Install GRUB bootloader using cexec (chroot into root partition sda1)
           - name: install-grub
             image: quay.io/tinkerbell/actions/cexec:latest
             timeout: 120
             pid: host
             environment:
-              BLOCK_DEVICE: /dev/sda16
+              BLOCK_DEVICE: /dev/sda1
               FS_TYPE: ext4
               CHROOT: "y"
               DEFAULT_INTERPRETER: "/bin/bash -c"
