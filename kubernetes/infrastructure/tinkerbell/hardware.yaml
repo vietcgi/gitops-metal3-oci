@@ -19,7 +19,7 @@ spec:
         mac: 00:0c:29:73:03:4b
         uefi: true
       netboot:
-        allowPXE: false
+        allowPXE: true
         allowWorkflow: true
   metadata:
     facility:
