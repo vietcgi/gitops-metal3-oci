@@ -1,24 +1,47 @@
 #!ipxe
-# Boot Menu for Colocation Servers
-# Choose OS at PXE boot time - no DHCP changes needed
+# Smart Boot Script for Remote Servers
+# Checks for a boot flag file, defaults to local disk boot
+#
+# To trigger install remotely:
+#   # Install Harvester:
+#   echo -e "#!ipxe\ngoto harvester" > /var/www/html/boot-flags/00-21-9b-a1-dc-c0
+#
+#   # Install Ubuntu:
+#   echo -e "#!ipxe\ngoto tinkerbell" > /var/www/html/boot-flags/00-21-9b-a1-dc-c0
+#
+#   # Then reboot the server
+#
+# After install completes, delete the flag:
+#   rm /var/www/html/boot-flags/00-21-9b-a1-dc-c0
 
-:start
-menu Colocation PXE Boot Menu
-item --gap --             ---- Operating Systems ----
-item harvester            Harvester HCI v1.6.1 (wipes disk!)
-item tinkerbell           Ubuntu via Tinkerbell
-item --gap --             ---- Other Options ----
-item local                Boot from local disk
-item shell                Drop to iPXE shell
-choose --timeout 30000 --default local selected || goto local
-goto ${selected}
+echo
+echo ============================================
+echo   Colocation PXE Boot
+echo   MAC: ${mac}
+echo ============================================
+echo
+
+set boot_flag_url http://108.181.38.67:8080/boot-flags/${mac:hexhyp}
+
+echo Checking for boot flag at ${boot_flag_url}...
+chain ${boot_flag_url} || goto local
 
 :harvester
-echo Booting Harvester installer...
+echo
+echo ============================================
+echo   Installing Harvester HCI v1.6.1
+echo   THIS WILL WIPE THE DISK!
+echo ============================================
+echo
+sleep 3
 chain http://108.181.38.67:8081/harvester/harvester.ipxe || goto failed
 
 :tinkerbell
-echo Handing off to Tinkerbell...
+echo
+echo ============================================
+echo   Installing Ubuntu via Tinkerbell
+echo ============================================
+echo
 set tink_ip tinkerbell.qualityspace.com
 set tink_server ${tink_ip}
 set grpc_authority ${tink_ip}:42113
@@ -26,15 +49,10 @@ set tinkerbell_tls false
 chain http://${tink_ip}/ipxe/script/${mac}/auto.ipxe || goto local
 
 :local
-echo Booting from local disk...
+echo No boot flag found - booting from local disk...
 iseq ${platform} pcbios && sanboot --no-describe --drive 0x80 || exit
 
-:shell
-echo Dropping to iPXE shell. Type 'exit' to return to menu.
-shell
-goto start
-
 :failed
-echo Boot failed! Returning to menu in 5 seconds...
-sleep 5
-goto start
+echo Boot failed! Booting from local disk...
+sleep 3
+goto local
