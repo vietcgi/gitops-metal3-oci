@@ -9,9 +9,10 @@ NAMESPACE="tink-system"
 FLUX_KUSTOMIZATION="infrastructure"
 
 # Timeouts
-MAX_WORKFLOW_SECONDS=1800   # 30 minutes for workflow to reach kexec
-MAX_KEXEC_SECONDS=300       # 5 minutes for kexec to complete
-MAX_VERIFY_SECONDS=180      # 3 minutes to verify new OS
+MAX_WORKFLOW_SECONDS=1800   # 30 minutes for workflow to reach reboot
+MAX_REBOOT_OFFLINE=600      # 10 minutes for server to go offline (BIOS reboot is slow)
+MAX_REBOOT_ONLINE=600       # 10 minutes for server to come back online (BIOS POST + GRUB + kernel)
+MAX_VERIFY_SECONDS=300      # 5 minutes to verify new OS (cloud-init can be slow)
 
 # Colors for output
 RED='\033[0;31m'
@@ -168,31 +169,39 @@ done
 # ============================================================================
 # PHASE 2: Wait for server to go OFFLINE (reboot terminates HookOS)
 # PXE is already disabled at this point, so server will boot from disk
+# Note: Bare metal servers (like Dell R610) do full BIOS reboot, not kexec
+# Note: Server may already be offline if reboot happened before we got here
 # ============================================================================
-log_info "Phase 2: Waiting for server to go offline (reboot terminating HookOS)..."
+log_info "Phase 2: Waiting for server to go offline (reboot/kexec terminating HookOS)..."
 
-KEXEC_START_TIME=$(date +%s)
-while true; do
-    CURRENT_TIME=$(date +%s)
-    ELAPSED=$((CURRENT_TIME - KEXEC_START_TIME))
+# First check if server is already offline (reboot may have happened fast)
+if ! nc -z -w2 "$TARGET_IP" 22 2>/dev/null; then
+    log_success "Server is already offline - reboot in progress, moving to phase 3"
+else
+    REBOOT_START_TIME=$(date +%s)
+    while true; do
+        CURRENT_TIME=$(date +%s)
+        ELAPSED=$((CURRENT_TIME - REBOOT_START_TIME))
 
-    if [ $ELAPSED -gt $MAX_KEXEC_SECONDS ]; then
-        log_error "Timeout waiting for server to go offline after ${MAX_KEXEC_SECONDS}s"
-        exit 1
-    fi
+        if [ $ELAPSED -gt $MAX_REBOOT_OFFLINE ]; then
+            log_error "Timeout waiting for server to go offline after ${MAX_REBOOT_OFFLINE}s"
+            exit 1
+        fi
 
-    # Check if server is offline (port 22 not responding)
-    if ! nc -z -w2 "$TARGET_IP" 22 2>/dev/null; then
-        log_success "Server went offline - kexec executed, moving to phase 3"
-        break
-    fi
+        # Check if server is offline (port 22 not responding)
+        if ! nc -z -w2 "$TARGET_IP" 22 2>/dev/null; then
+            log_success "Server went offline - reboot initiated, moving to phase 3"
+            break
+        fi
 
-    log_info "Waiting for server to go offline... (${ELAPSED}s)"
-    sleep 3
-done
+        log_info "Waiting for server to go offline... (${ELAPSED}s)"
+        sleep 3
+    done
+fi
 
 # ============================================================================
 # PHASE 3: Wait for server to come back ONLINE
+# Note: Bare metal BIOS POST + GRUB + kernel boot can take several minutes
 # ============================================================================
 log_info "Phase 3: Waiting for server to boot into new OS..."
 
@@ -201,8 +210,8 @@ while true; do
     CURRENT_TIME=$(date +%s)
     ELAPSED=$((CURRENT_TIME - BOOT_START_TIME))
 
-    if [ $ELAPSED -gt $MAX_KEXEC_SECONDS ]; then
-        log_error "Timeout waiting for server to come back online after ${MAX_KEXEC_SECONDS}s"
+    if [ $ELAPSED -gt $MAX_REBOOT_ONLINE ]; then
+        log_error "Timeout waiting for server to come back online after ${MAX_REBOOT_ONLINE}s"
         exit 1
     fi
 
