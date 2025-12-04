@@ -30,12 +30,13 @@ install:
     ip: 108.181.38.87
     subnet_mask: 255.255.255.224
     gateway: 108.181.38.65
+    mtu: 1500
   # VIP for Harvester API (use same IP for single-node)
   vip: 108.181.38.87
   vip_mode: static
   # Force MBR/BIOS install (Dell R610 is BIOS-only)
+  force_mbr: true
   force_efi: false
-  # Skip hardware checks (Dell R610 is older hardware)
 
 # Cluster token for joining nodes later
 token: harvester-colo-cluster
