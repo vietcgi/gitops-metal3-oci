@@ -1,0 +1,41 @@
+scheme_version: 1
+
+# Harvester CREATE mode configuration for anvil (Dell R610)
+# This establishes a new single-node Harvester cluster
+
+os:
+  hostname: anvil
+  # Password hash for 'harvester' - same as Ubuntu setup
+  password: "$6$6cUHnjJ1JvrwzVVL$9qXzyIVh1CgCIaLkSyadZ2gJeiofWZ0rAVUoPWQQPMMFW31Y2dmXToe3jzG3wZPnXh3gvv3EGZGxXh/mcvS.S1"
+  ssh_authorized_keys:
+    - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC5/lrhHAQdTRfppzfA7Emn/hcSHobEpl6LzNFsxD9Pi0+sRT8K2shdwZ02vk+eZT3chi6Pwf5Cb82/NS7yLlq4eUxG/IKp1HxVKTdTQgA3E0HF/mmwveCnuR55iUvNNliRyWbBnY/uw5yfhVrDIyAwP+rE16M/ROlorbskJ4R6fFMr4M4o2PjAFL2KH+1lnMrtbNoovqg7/xLBhiDGhs6sNHl4E34PHICkH7Xqkh+7TCDbpjDGxMuNL5RG1zMG1fLFfJX0QIQanN2jHJU2NEMBVWB+BxNYWKWACHQevubER8KdxksBj3Newi65zx2enDoKNE6kpzi2lqPdDpUXwwVf kevin
+    - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIND/fC/qBE102c4RLsxdto+62Zaq4KdlqSQwpuWR9wcC ubuntu@metal-foundry-control
+  dns_nameservers:
+    - 8.8.8.8
+    - 8.8.4.4
+  ntp_servers:
+    - time.google.com
+    - time.cloudflare.com
+
+install:
+  mode: create
+  # Dell R610 has single disk
+  device: /dev/sda
+  # Management network interface - Dell R610 uses eno1
+  management_interface:
+    interfaces:
+      - name: eno1
+        hwAddr: "00:21:9b:a1:dc:c0"
+    method: static
+    ip: 108.181.38.87
+    subnet_mask: 255.255.255.224
+    gateway: 108.181.38.65
+  # VIP for Harvester API (use same IP for single-node)
+  vip: 108.181.38.87
+  vip_mode: static
+  # Force MBR/BIOS install (Dell R610 is BIOS-only)
+  force_efi: false
+  # Skip hardware checks (Dell R610 is older hardware)
+
+# Cluster token for joining nodes later
+token: harvester-colo-cluster
