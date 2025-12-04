@@ -312,6 +312,12 @@ spec:
           - /dev/console:/dev/console
           - /lib/firmware:/lib/firmware:ro
         actions:
+          # Install kexec-tools (not included in HookOS by default)
+          - name: install-kexec-tools
+            image: justincormack/nsenter1
+            timeout: 120
+            pid: host
+            command: ["/usr/bin/nsenter", "-t", "1", "-m", "-u", "-i", "-n", "--", "/bin/sh", "-c", "apk add --no-cache kexec-tools && kexec --version"]
           # Download Harvester kernel and initrd
           - name: download-harvester-files
             image: justincormack/nsenter1
