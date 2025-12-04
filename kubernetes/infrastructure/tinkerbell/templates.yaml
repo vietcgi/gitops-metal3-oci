@@ -291,18 +291,18 @@ spec:
             pid: host
             command: ["/usr/bin/nsenter", "-t", "1", "-m", "-u", "-i", "-n", "--", "/bin/sh", "-c", "sync && reboot -f"]
 ---
-# Harvester HCI v1.6.1 Installation Template for anvil (Dell R610)
+# Harvester HCI v1.6.1 Installation Template
 # Downloads Harvester kernel/initrd and kexec's into the installer
 # Harvester's installer handles disk partitioning and installation
 apiVersion: tinkerbell.org/v1alpha1
 kind: Template
 metadata:
-  name: anvil-harvester
+  name: harvester
   namespace: tink-system
 spec:
   data: |
     version: "0.1"
-    name: anvil-harvester
+    name: harvester
     global_timeout: 1800
     tasks:
       - name: harvester-installation

@@ -22,7 +22,7 @@ metadata:
   name: anvil-harvester
   namespace: tink-system
 spec:
-  templateRef: anvil-harvester
+  templateRef: harvester
   hardwareRef: anvil
   hardwareMap:
     device_1: 00:21:9b:a1:dc:c0
