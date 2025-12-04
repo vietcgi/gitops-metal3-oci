@@ -267,20 +267,22 @@ spec:
           # Install Broadcom bnx2 firmware for Dell R610 NICs
           # Copy firmware from HookOS (which has it) and regenerate initramfs
           # This avoids network dependency during provisioning
+          # Ubuntu cloud images have kernel on sda16 (boot partition), must mount to /boot
           # Idempotent: cleans up mounts before starting, handles missing firmware gracefully
           - name: install-bnx2-firmware
             image: justincormack/nsenter1
             timeout: 180
             pid: host
-            command: ["/usr/bin/nsenter", "-t", "1", "-m", "-u", "-i", "-n", "--", "/bin/sh", "-c", "umount /mnt/sys /mnt/proc /mnt/dev /mnt 2>/dev/null || true; mount /dev/sda1 /mnt && mkdir -p /mnt/lib/firmware/bnx2 && cp -v /lib/firmware/bnx2/* /mnt/lib/firmware/bnx2/ 2>/dev/null || echo 'No bnx2 firmware in HookOS'; mount --bind /dev /mnt/dev && mount --bind /proc /mnt/proc && mount --bind /sys /mnt/sys && chroot /mnt update-initramfs -u -k all; echo 'Firmware files:'; ls -la /mnt/lib/firmware/bnx2/ 2>/dev/null || true; umount /mnt/sys /mnt/proc /mnt/dev /mnt 2>/dev/null || true"]
+            command: ["/usr/bin/nsenter", "-t", "1", "-m", "-u", "-i", "-n", "--", "/bin/sh", "-c", "umount /mnt/sys /mnt/proc /mnt/dev /mnt/boot /mnt 2>/dev/null || true; mount /dev/sda1 /mnt && mount /dev/sda16 /mnt/boot && mkdir -p /mnt/lib/firmware/bnx2 && cp -v /lib/firmware/bnx2/* /mnt/lib/firmware/bnx2/ 2>/dev/null || echo 'No bnx2 firmware in HookOS'; mount --bind /dev /mnt/dev && mount --bind /proc /mnt/proc && mount --bind /sys /mnt/sys && chroot /mnt update-initramfs -u -k all; echo 'Firmware files:'; ls -la /mnt/lib/firmware/bnx2/ 2>/dev/null || true; umount /mnt/sys /mnt/proc /mnt/dev /mnt/boot /mnt 2>/dev/null || true"]
           # Install GRUB bootloader for BIOS/MBR using nsenter
           # Must bind mount /dev, /proc, /sys for grub-install to detect disk properly
+          # Ubuntu cloud images have kernel on sda16 (boot partition), must mount to /boot
           # Idempotent: cleans up mounts before starting
           - name: install-grub
             image: justincormack/nsenter1
             timeout: 180
             pid: host
-            command: ["/usr/bin/nsenter", "-t", "1", "-m", "-u", "-i", "-n", "--", "/bin/sh", "-c", "umount /mnt/sys /mnt/proc /mnt/dev /mnt 2>/dev/null || true; mount /dev/sda1 /mnt && mount --bind /dev /mnt/dev && mount --bind /proc /mnt/proc && mount --bind /sys /mnt/sys && chroot /mnt grub-install /dev/sda && chroot /mnt update-grub; umount /mnt/sys /mnt/proc /mnt/dev /mnt 2>/dev/null || true"]
+            command: ["/usr/bin/nsenter", "-t", "1", "-m", "-u", "-i", "-n", "--", "/bin/sh", "-c", "umount /mnt/sys /mnt/proc /mnt/dev /mnt/boot /mnt 2>/dev/null || true; mount /dev/sda1 /mnt && mount /dev/sda16 /mnt/boot && mount --bind /dev /mnt/dev && mount --bind /proc /mnt/proc && mount --bind /sys /mnt/sys && chroot /mnt grub-install /dev/sda && chroot /mnt update-grub; umount /mnt/sys /mnt/proc /mnt/dev /mnt/boot /mnt 2>/dev/null || true"]
           # Reboot using nsenter (host namespace) - actually reboots the machine
           # This action won't complete because reboot terminates HookOS, but workflow already SUCCESS
           - name: reboot-into-os
