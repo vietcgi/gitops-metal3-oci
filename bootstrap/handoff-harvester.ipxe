@@ -1,0 +1,24 @@
+#!ipxe
+# Harvester PXE Boot Handoff Script
+# This script chainloads directly to Harvester installer (bypasses Tinkerbell)
+
+echo ====================================================
+echo   Colocation Bootstrapper: Harvester Install
+echo ====================================================
+echo
+echo Chainloading to Harvester installer...
+
+chain http://108.181.38.67:8081/harvester/harvester.ipxe || goto fail
+
+:fail
+echo
+echo ERROR: Failed to chainload Harvester installer!
+echo Falling back to local disk boot...
+sleep 5
+iseq ${platform} pcbios && goto bios_boot || goto uefi_boot
+
+:bios_boot
+sanboot --no-describe --drive 0x80 || exit
+
+:uefi_boot
+exit
