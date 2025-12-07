@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: baremetal-operator-system
+  labels:
+    app.kubernetes.io/name: metal3
+    app.kubernetes.io/component: baremetal-operator
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: capm3-system
+  labels:
+    app.kubernetes.io/name: metal3
+    app.kubernetes.io/component: cluster-api-provider-metal3

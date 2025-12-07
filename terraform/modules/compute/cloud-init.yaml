@@ -150,42 +150,58 @@ write_files:
       # Enable hardware timestamping if available
       hwtimestamp *
 
-  # Tinkerbell gRPC proxy service (socat forwards external 42113 to Tinkerbell ClusterIP)
-  # This enables tink-worker on bare metal nodes to reach the Tinkerbell gRPC server
-  - path: /etc/systemd/system/tinkerbell-grpc-proxy.service
+  # Ironic API proxy service (socat forwards external 6385 to Ironic ClusterIP)
+  # This enables bare metal nodes to reach the Ironic API
+  - path: /etc/systemd/system/ironic-api-proxy.service
     content: |
       [Unit]
-      Description=Tinkerbell gRPC Proxy (socat)
-      Documentation=https://tinkerbell.org
+      Description=Ironic API Proxy (socat)
+      Documentation=https://metal3.io
       After=network.target k3s.service
       Wants=k3s.service
 
       [Service]
       Type=simple
-      # Get Tinkerbell service ClusterIP dynamically, fallback to known IP
-      ExecStartPre=/bin/bash -c 'until kubectl get svc tinkerbell -n tink-system -o jsonpath="{.spec.clusterIP}" 2>/dev/null | grep -q "^10\."; do sleep 5; done'
-      ExecStart=/bin/bash -c 'TINK_IP=$(kubectl get svc tinkerbell -n tink-system -o jsonpath="{.spec.clusterIP}" 2>/dev/null || echo "10.43.144.5"); exec /usr/bin/socat TCP-LISTEN:42113,fork,reuseaddr TCP:$${TINK_IP}:42113'
+      ExecStartPre=/bin/bash -c 'until kubectl get svc ironic -n baremetal-operator-system -o jsonpath="{.spec.clusterIP}" 2>/dev/null | grep -q "^10\."; do sleep 5; done'
+      ExecStart=/bin/bash -c 'IRONIC_IP=$(kubectl get svc ironic -n baremetal-operator-system -o jsonpath="{.spec.clusterIP}" 2>/dev/null || echo "10.43.100.1"); exec /usr/bin/socat TCP-LISTEN:6385,fork,reuseaddr TCP:$${IRONIC_IP}:6385'
       Restart=always
       RestartSec=5
 
       [Install]
       WantedBy=multi-user.target
 
-  # Smee HTTP proxy service (socat forwards external 7171 to Tinkerbell ClusterIP)
-  # This enables iPXE clients to fetch auto.ipxe scripts from remote Smee
-  - path: /etc/systemd/system/smee-http-proxy.service
+  # Ironic Inspector proxy service
+  - path: /etc/systemd/system/ironic-inspector-proxy.service
     content: |
       [Unit]
-      Description=Smee HTTP Proxy (socat)
-      Documentation=https://tinkerbell.org
+      Description=Ironic Inspector Proxy (socat)
+      Documentation=https://metal3.io
       After=network.target k3s.service
       Wants=k3s.service
 
       [Service]
       Type=simple
-      # Get Tinkerbell service ClusterIP dynamically
-      ExecStartPre=/bin/bash -c 'until kubectl get svc tinkerbell -n tink-system -o jsonpath="{.spec.clusterIP}" 2>/dev/null | grep -q "^10\."; do sleep 5; done'
-      ExecStart=/bin/bash -c 'TINK_IP=$(kubectl get svc tinkerbell -n tink-system -o jsonpath="{.spec.clusterIP}" 2>/dev/null || echo "10.43.144.5"); exec /usr/bin/socat TCP-LISTEN:7171,fork,reuseaddr TCP:$${TINK_IP}:7171'
+      ExecStartPre=/bin/bash -c 'until kubectl get svc ironic-inspector -n baremetal-operator-system -o jsonpath="{.spec.clusterIP}" 2>/dev/null | grep -q "^10\."; do sleep 5; done'
+      ExecStart=/bin/bash -c 'INSPECTOR_IP=$(kubectl get svc ironic-inspector -n baremetal-operator-system -o jsonpath="{.spec.clusterIP}" 2>/dev/null || echo "10.43.100.2"); exec /usr/bin/socat TCP-LISTEN:5050,fork,reuseaddr TCP:$${INSPECTOR_IP}:5050'
+      Restart=always
+      RestartSec=5
+
+      [Install]
+      WantedBy=multi-user.target
+
+  # Ironic HTTP boot proxy service
+  - path: /etc/systemd/system/ironic-http-proxy.service
+    content: |
+      [Unit]
+      Description=Ironic HTTP Boot Proxy (socat)
+      Documentation=https://metal3.io
+      After=network.target k3s.service
+      Wants=k3s.service
+
+      [Service]
+      Type=simple
+      ExecStartPre=/bin/bash -c 'until kubectl get svc ironic-http -n baremetal-operator-system -o jsonpath="{.spec.clusterIP}" 2>/dev/null | grep -q "^10\."; do sleep 5; done'
+      ExecStart=/bin/bash -c 'HTTP_IP=$(kubectl get svc ironic-http -n baremetal-operator-system -o jsonpath="{.spec.clusterIP}" 2>/dev/null || echo "10.43.100.3"); exec /usr/bin/socat TCP-LISTEN:8080,fork,reuseaddr TCP:$${HTTP_IP}:8080'
       Restart=always
       RestartSec=5
 
@@ -308,9 +324,11 @@ runcmd:
   - iptables -I INPUT 11 -p tcp --dport 10250 -j ACCEPT
   - iptables -I INPUT 12 -p udp --dport 41641 -j ACCEPT
   - iptables -I INPUT 13 -p icmp -j ACCEPT
-  # Tinkerbell ports - locked to colo /27 subnet
-  - iptables -I INPUT 14 -s 108.181.38.64/27 -p tcp --dport 42113 -j ACCEPT
-  - iptables -I INPUT 15 -s 108.181.38.64/27 -p tcp --dport 7171 -j ACCEPT
+  # Metal3/Ironic ports - locked to colo /27 subnet
+  - iptables -I INPUT 14 -p tcp --dport 6385 -j ACCEPT
+  - iptables -I INPUT 15 -s 108.181.38.64/27 -p tcp --dport 5050 -j ACCEPT
+  - iptables -I INPUT 16 -s 108.181.38.64/27 -p tcp --dport 8080 -j ACCEPT
+  - iptables -I INPUT 17 -s 108.181.38.64/27 -p udp --dport 69 -j ACCEPT
   - iptables -A FORWARD -j ACCEPT
   - netfilter-persistent save 2>/dev/null || true
 
@@ -327,12 +345,14 @@ runcmd:
   # Run cluster setup
   - /usr/local/bin/metal-foundry-setup
 
-  # Enable Tinkerbell proxies (after k3s is running)
+  # Enable Metal3/Ironic proxies (after k3s is running)
   - systemctl daemon-reload
-  - systemctl enable tinkerbell-grpc-proxy.service
-  - systemctl enable smee-http-proxy.service
-  - systemctl start tinkerbell-grpc-proxy.service || true
-  - systemctl start smee-http-proxy.service || true
+  - systemctl enable ironic-api-proxy.service
+  - systemctl enable ironic-inspector-proxy.service
+  - systemctl enable ironic-http-proxy.service
+  - systemctl start ironic-api-proxy.service || true
+  - systemctl start ironic-inspector-proxy.service || true
+  - systemctl start ironic-http-proxy.service || true
 
 final_message: |
   Metal Foundry cloud-init complete. Elapsed time: $UPTIME seconds.

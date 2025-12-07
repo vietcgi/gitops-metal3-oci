@@ -58,7 +58,7 @@ variable "ssh_public_key" {
 variable "project_name" {
   description = "Project name used for resource naming"
   type        = string
-  default     = "metal-foundry"
+  default     = "metal3-oci"
 }
 
 #=============================================================================

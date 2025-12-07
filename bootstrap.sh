@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# GitOps Metal Foundry - Bootstrap Script
+# GitOps Metal3 OCI - Bootstrap Script
 #
 # Run from your local machine (Mac/Linux). This script will:
 #   1. Install required tools (oci-cli, gh, jq) if missing
@@ -12,7 +12,7 @@
 #   ./bootstrap.sh
 #
 # Or run directly:
-#   curl -sSL https://raw.githubusercontent.com/vietcgi/gitops-metal-foundry/main/bootstrap.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/vietcgi/gitops-metal3-oci/main/bootstrap.sh | bash
 #
 
 set -euo pipefail
@@ -67,7 +67,7 @@ banner() {
 EOF
     echo -e "${NC}"
     echo -e "   ${BOLD}Bare Metal Cloud on Oracle Free Tier${NC}"
-    echo -e "   ${BOLD}Powered by: Tinkerbell + K3s + Cilium + Flux${NC}"
+    echo -e "   ${BOLD}Powered by: Metal3/Ironic + K3s + Cilium + Flux${NC}"
     echo ""
     echo -e "   ${GREEN}Cost: \$0.00/month (Always Free Tier)${NC}"
     echo ""
@@ -498,7 +498,7 @@ create_compartment() {
         OCI_COMPARTMENT=$(oci iam compartment create $AUTH_FLAG \
             --compartment-id "$OCI_TENANCY" \
             --name "$PROJECT_NAME" \
-            --description "GitOps Metal Foundry - Bare Metal Cloud" \
+            --description "GitOps Metal3 OCI - Bare Metal Cloud" \
             --wait-for-state ACTIVE \
             --query 'data.id' \
             --raw-output 2>/dev/null) || {

@@ -1,0 +1,111 @@
+# Example BareMetalHost for Metal3
+# Copy and customize this for your bare metal servers
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: example-host-bmc-secret
+  namespace: baremetal-operator-system
+type: Opaque
+stringData:
+  username: admin
+  password: password  # Replace with actual BMC password
+---
+apiVersion: metal3.io/v1alpha1
+kind: BareMetalHost
+metadata:
+  name: example-host
+  namespace: baremetal-operator-system
+  labels:
+    cluster.x-k8s.io/cluster-name: my-cluster
+spec:
+  # BMC (Baseboard Management Controller) connection
+  bmc:
+    # IPMI example
+    address: ipmi://192.168.1.100
+    # Redfish example (preferred for newer servers)
+    # address: redfish://192.168.1.100/redfish/v1/Systems/1
+    # iDRAC example (Dell servers)
+    # address: idrac://192.168.1.100
+    credentialsName: example-host-bmc-secret
+    disableCertificateVerification: true
+
+  # Boot MAC address (for PXE boot)
+  bootMACAddress: "00:11:22:33:44:55"
+
+  # Boot mode (UEFI or legacy)
+  bootMode: UEFI
+  # bootMode: legacy  # For older BIOS-only servers
+
+  # Online status - set to true to make available for provisioning
+  online: true
+
+  # Hardware profile (optional - auto-detected if not set)
+  # hardwareProfile: dell-r610
+
+  # Root device hints (optional - specify which disk to install to)
+  rootDeviceHints:
+    deviceName: /dev/sda
+    # Or by size
+    # minSizeGigabytes: 100
+    # Or by model
+    # model: "INTEL SSD"
+
+  # Inspection disabled - set to true to skip hardware inspection
+  # externallyProvisioned: false
+
+  # Firmware settings (optional)
+  # firmware:
+  #   simultaneousMultithreadingEnabled: true
+  #   virtualizationEnabled: true
+
+  # RAID configuration (optional)
+  # raid:
+  #   hardwareRAIDVolumes:
+  #     - name: root
+  #       level: "1"
+  #       sizeGibibytes: 100
+  #       physicalDisks:
+  #         - /dev/sda
+  #         - /dev/sdb
+
+  # Consumer reference - set automatically by Cluster API
+  # consumerRef:
+  #   apiVersion: cluster.x-k8s.io/v1beta1
+  #   kind: Machine
+  #   name: my-machine
+  #   namespace: default
+
+  # Image to deploy
+  image:
+    url: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img
+    checksum: https://cloud-images.ubuntu.com/releases/24.04/release/SHA256SUMS
+    checksumType: sha256
+    format: qcow2
+
+  # User data (cloud-init)
+  userData:
+    name: example-host-userdata
+    namespace: baremetal-operator-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: example-host-userdata
+  namespace: baremetal-operator-system
+type: Opaque
+stringData:
+  userData: |
+    #cloud-config
+    hostname: example-host
+    users:
+      - name: ubuntu
+        sudo: ALL=(ALL) NOPASSWD:ALL
+        shell: /bin/bash
+        ssh_authorized_keys:
+          - ssh-rsa YOUR_SSH_PUBLIC_KEY
+    package_update: true
+    packages:
+      - curl
+      - wget
+      - git

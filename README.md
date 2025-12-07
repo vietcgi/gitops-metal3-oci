@@ -1,6 +1,6 @@
-# GitOps Metal Foundry
+# GitOps Metal3 OCI
 
-A fully automated, self-bootstrapping bare metal cloud running on **Oracle Free Tier**.
+A fully automated, self-bootstrapping bare metal cloud using **Metal3/Ironic** running on **Oracle Free Tier**.
 
 **Cost: $0.00/month** - Uses only Always Free resources.
 
@@ -10,8 +10,8 @@ A fully automated, self-bootstrapping bare metal cloud running on **Oracle Free 
 - **100% GitOps** - All configuration stored in Git, changes via pull requests
 - **Zero Secrets** - Uses OIDC federation for passwordless authentication
 - **Cross-Platform** - Bootstrap from any browser via OCI Cloud Shell
-- **Bare Metal Ready** - Provision physical servers at your colo/home lab
-- **Production Grade** - K3s, Cilium, Flux, cert-manager, and more
+- **Bare Metal Ready** - Provision physical servers at your colo/home lab using Metal3
+- **Production Grade** - K3s, Cilium, Flux, Cluster API, and more
 
 ## Architecture
 
@@ -27,9 +27,9 @@ A fully automated, self-bootstrapping bare metal cloud running on **Oracle Free 
 │                    Oracle Cloud Free Tier ($0/month)                 │
 │                                                                      │
 │   ┌─────────────────────────────────────────────────────────────┐   │
-│   │           Control Plane VM (1GB RAM - FREE)                 │   │
+│   │         Control Plane VM (ARM A1.Flex - 4 CPU, 24GB)        │   │
 │   │                                                              │   │
-│   │   K3s │ Cilium │ Flux │ Tinkerbell │ Tailscale             │   │
+│   │   K3s │ Cilium │ Flux │ Metal3/Ironic │ CAPI │ Tailscale   │   │
 │   └─────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────┘
                                    │
@@ -40,7 +40,7 @@ A fully automated, self-bootstrapping bare metal cloud running on **Oracle Free 
 │                                                                      │
 │   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐              │
 │   │ Colo Server  │  │ Home Server  │  │ Edge Device  │              │
-│   │   (K3s)      │  │   (K3s)      │  │   (K3s)      │              │
+│   │ (BareMetalHost) │ (BareMetalHost) │ (BareMetalHost) │              │
 │   └──────────────┘  └──────────────┘  └──────────────┘              │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -63,7 +63,7 @@ A fully automated, self-bootstrapping bare metal cloud running on **Oracle Free 
 
 3. **Run the bootstrap:**
    ```bash
-   curl -sSL https://raw.githubusercontent.com/YOUR_USER/gitops-metal-foundry/main/bootstrap.sh | bash
+   curl -sSL https://raw.githubusercontent.com/YOUR_USER/gitops-metal3-oci/main/bootstrap.sh | bash
    ```
 
 4. **Follow the prompts** for:
@@ -83,7 +83,9 @@ A fully automated, self-bootstrapping bare metal cloud running on **Oracle Free 
 | **K3s** | Lightweight Kubernetes |
 | **Cilium** | eBPF networking, load balancing, ingress |
 | **Flux CD** | GitOps continuous deployment |
-| **Tinkerbell** | Bare metal provisioning |
+| **Metal3/Ironic** | Bare metal provisioning (OpenStack Ironic) |
+| **Baremetal Operator** | Kubernetes-native BareMetalHost management |
+| **Cluster API** | Declarative cluster lifecycle management |
 | **Tailscale** | VPN mesh to colo/home lab |
 | **cert-manager** | TLS certificate automation |
 | **Sealed Secrets** | GitOps-safe secret management |
@@ -92,80 +94,93 @@ A fully automated, self-bootstrapping bare metal cloud running on **Oracle Free 
 
 | Resource | Limit | Usage |
 |----------|-------|-------|
-| AMD VM | 2 VMs | 1 (control plane) |
-| Storage | 200 GB | ~100 GB |
+| ARM VM (A1.Flex) | 4 OCPU, 24GB | 4 OCPU, 24GB (control plane) |
+| Storage | 200 GB | 200 GB |
 | Bandwidth | 10 TB/mo | Minimal |
 
 **Monthly cost: $0.00**
 
 ## Adding Bare Metal Servers
 
-1. **Register hardware** in `tinkerbell/hardware/`:
+1. **Create BMC credentials secret:**
    ```yaml
-   apiVersion: tinkerbell.org/v1alpha1
-   kind: Hardware
+   apiVersion: v1
+   kind: Secret
+   metadata:
+     name: my-server-bmc
+     namespace: baremetal-operator-system
+   type: Opaque
+   stringData:
+     username: admin
+     password: your-bmc-password
+   ```
+
+2. **Register BareMetalHost** in `metal3/hosts/`:
+   ```yaml
+   apiVersion: metal3.io/v1alpha1
+   kind: BareMetalHost
    metadata:
      name: my-server
+     namespace: baremetal-operator-system
    spec:
-     network:
-       interfaces:
-         - dhcp:
-             mac: "00:00:00:00:00:01"  # Your server's MAC
+     bmc:
+       address: ipmi://192.168.1.100
+       credentialsName: my-server-bmc
+     bootMACAddress: "00:11:22:33:44:55"
+     bootMode: UEFI
+     online: true
+     image:
+       url: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img
+       checksum: https://cloud-images.ubuntu.com/releases/24.04/release/SHA256SUMS
+       checksumType: sha256
+       format: qcow2
    ```
 
-2. **Create boot media:**
-   ```bash
-   cd boot-media
-   make usb TINKERBELL_URL=https://tinkerbell.yourdomain.com
-   ```
+3. **Apply and watch** the server get provisioned automatically
 
-3. **Boot the server** from USB/ISO
+## Metal3 vs Tinkerbell
 
-4. **Watch it provision** automatically and join the cluster
+This project uses Metal3 (Ironic-based) for bare metal provisioning:
+
+| Aspect | Metal3/Ironic | Tinkerbell |
+|--------|---------------|------------|
+| CRD | BareMetalHost | Hardware, Template, Workflow |
+| Boot | Ironic PXE/iPXE | Smee + HookOS |
+| BMC | Native IPMI/Redfish/iDRAC | Rufio |
+| Lifecycle | Cluster API integration | Custom workflows |
+| Community | OpenStack/CNCF | Equinix Metal |
 
 ## GitHub Actions CI/CD (OIDC - No Static Secrets)
 
-This project uses **OIDC (OpenID Connect)** for passwordless authentication from GitHub Actions to Oracle Cloud. No API keys or secrets are stored.
-
-**How it works:**
-```
-GitHub Actions                              OCI
-     │                                       │
-     │ 1. Request JWT (signed by GitHub)     │
-     ├──────────────────────────────────────►│
-     │                                       │
-     │ 2. Validate JWT + match Dynamic Group │
-     │◄──────────────────────────────────────┤
-     │                                       │
-     │ 3. Terraform apply with temp creds    │
-     ├──────────────────────────────────────►│
-```
+This project uses **OIDC (OpenID Connect)** for passwordless authentication from GitHub Actions to Oracle Cloud.
 
 **Setup (after bootstrap):**
 
-Add these as **GitHub Repository Variables** (not secrets):
+Add these as **GitHub Repository Secrets**:
 
-| Variable | Value |
-|----------|-------|
-| `OCI_TENANCY` | Your tenancy OCID |
-| `OCI_COMPARTMENT` | Your compartment OCID |
-| `OCI_REGION` | e.g., `us-ashburn-1` |
-
-These are public identifiers - the OIDC token provides authentication.
+| Secret | Value |
+|--------|-------|
+| `TF_VAR_TENANCY_OCID` | Your tenancy OCID |
+| `TF_VAR_COMPARTMENT_OCID` | Your compartment OCID |
+| `TF_VAR_REGION` | e.g., `us-ashburn-1` |
+| `TF_VAR_USER_OCID` | Your user OCID |
+| `TF_VAR_FINGERPRINT` | API key fingerprint |
+| `TF_VAR_PRIVATE_KEY` | API private key content |
+| `TF_VAR_SSH_PUBLIC_KEY` | SSH public key for VM access |
 
 ## Directory Structure
 
 ```
-gitops-metal-foundry/
+gitops-metal3-oci/
 ├── bootstrap.sh           # One-command setup
 ├── terraform/             # OCI infrastructure
 ├── kubernetes/            # Flux-managed K8s manifests
 │   ├── infrastructure/   # Core components
+│   │   └── metal3/       # Ironic, BMO, CAPI
 │   └── apps/             # Your applications
-├── tinkerbell/           # Bare metal configs
-│   ├── hardware/         # Machine definitions
-│   ├── templates/        # OS templates
-│   └── workflows/        # Provisioning workflows
+├── metal3/               # Bare metal configs
+│   ├── hosts/            # BareMetalHost definitions
+│   └── secrets/          # BMC credentials (sealed)
 └── boot-media/           # iPXE boot image builder
 ```
 
@@ -174,8 +189,8 @@ gitops-metal-foundry/
 - [Architecture](docs/architecture.md)
 - [Adding Bare Metal](docs/adding-bare-metal.md)
 - [Troubleshooting](docs/troubleshooting.md)
-- [Cilium Troubleshooting](docs/cilium-troubleshooting.md)
-- [Cilium Debugging Scripts](docs/cilium-troubleshooting.md)
+- [Metal3 Documentation](https://metal3.io/documentation.html)
+- [Cluster API Book](https://cluster-api.sigs.k8s.io/)
 
 ## Contributing
 
@@ -187,8 +202,10 @@ MIT License - see [LICENSE](LICENSE)
 
 ## Acknowledgments
 
-- [Tinkerbell](https://tinkerbell.org/) - Bare metal provisioning
+- [Metal3](https://metal3.io/) - Bare metal provisioning for Kubernetes
+- [OpenStack Ironic](https://wiki.openstack.org/wiki/Ironic) - Bare metal service
 - [K3s](https://k3s.io/) - Lightweight Kubernetes
 - [Cilium](https://cilium.io/) - eBPF networking
 - [Flux CD](https://fluxcd.io/) - GitOps toolkit
 - [Tailscale](https://tailscale.com/) - Zero-config VPN
+- [Cluster API](https://cluster-api.sigs.k8s.io/) - Declarative cluster management

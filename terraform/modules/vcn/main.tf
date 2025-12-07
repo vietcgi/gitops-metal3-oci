@@ -154,16 +154,16 @@ resource "oci_core_security_list" "public" {
     }
   }
 
-  # Ingress - Tinkerbell HTTP boot
+  # Ingress - Ironic API
   ingress_security_rules {
     protocol    = "6" # TCP
     source      = "0.0.0.0/0"
     stateless   = false
-    description = "Tinkerbell HTTP boot"
+    description = "Ironic API"
 
     tcp_options {
-      min = 8080
-      max = 8080
+      min = 6385
+      max = 6385
     }
   }
 
@@ -205,29 +205,42 @@ resource "oci_core_security_list" "public" {
     }
   }
 
-  # Ingress - Tinkerbell gRPC (restricted to colo subnet)
+  # Ingress - Ironic Inspector (restricted to provisioning network)
   ingress_security_rules {
     protocol    = "6" # TCP
     source      = "108.181.38.64/27"
     stateless   = false
-    description = "Tinkerbell gRPC - locked to colo /27"
+    description = "Ironic Inspector - locked to colo /27"
 
     tcp_options {
-      min = 42113
-      max = 42113
+      min = 5050
+      max = 5050
     }
   }
 
-  # Ingress - Smee HTTP (restricted to colo subnet)
+  # Ingress - Ironic iPXE/HTTP boot (restricted to provisioning network)
   ingress_security_rules {
     protocol    = "6" # TCP
     source      = "108.181.38.64/27"
     stateless   = false
-    description = "Smee HTTP for iPXE - locked to colo /27"
+    description = "Ironic HTTP boot - locked to colo /27"
 
     tcp_options {
-      min = 7171
-      max = 7171
+      min = 8080
+      max = 8080
+    }
+  }
+
+  # Ingress - TFTP for PXE boot (restricted to provisioning network)
+  ingress_security_rules {
+    protocol    = "17" # UDP
+    source      = "108.181.38.64/27"
+    stateless   = false
+    description = "TFTP for PXE boot - locked to colo /27"
+
+    udp_options {
+      min = 69
+      max = 69
     }
   }
 
@@ -388,34 +401,66 @@ resource "oci_core_network_security_group_security_rule" "control_plane_tailscal
   }
 }
 
-resource "oci_core_network_security_group_security_rule" "control_plane_tinkerbell_grpc" {
+resource "oci_core_network_security_group_security_rule" "control_plane_ironic_api" {
   network_security_group_id = oci_core_network_security_group.control_plane.id
   direction                 = "INGRESS"
   protocol                  = "6"
-  source                    = "108.181.38.64/27"
+  source                    = "0.0.0.0/0"
   source_type               = "CIDR_BLOCK"
-  description               = "Tinkerbell gRPC - locked to colo /27"
+  description               = "Ironic API"
 
   tcp_options {
     destination_port_range {
-      min = 42113
-      max = 42113
+      min = 6385
+      max = 6385
     }
   }
 }
 
-resource "oci_core_network_security_group_security_rule" "control_plane_smee_http" {
+resource "oci_core_network_security_group_security_rule" "control_plane_ironic_inspector" {
   network_security_group_id = oci_core_network_security_group.control_plane.id
   direction                 = "INGRESS"
   protocol                  = "6"
   source                    = "108.181.38.64/27"
   source_type               = "CIDR_BLOCK"
-  description               = "Smee HTTP for iPXE - locked to colo /27"
+  description               = "Ironic Inspector - locked to colo /27"
 
   tcp_options {
     destination_port_range {
-      min = 7171
-      max = 7171
+      min = 5050
+      max = 5050
+    }
+  }
+}
+
+resource "oci_core_network_security_group_security_rule" "control_plane_ironic_http" {
+  network_security_group_id = oci_core_network_security_group.control_plane.id
+  direction                 = "INGRESS"
+  protocol                  = "6"
+  source                    = "108.181.38.64/27"
+  source_type               = "CIDR_BLOCK"
+  description               = "Ironic HTTP boot - locked to colo /27"
+
+  tcp_options {
+    destination_port_range {
+      min = 8080
+      max = 8080
+    }
+  }
+}
+
+resource "oci_core_network_security_group_security_rule" "control_plane_tftp" {
+  network_security_group_id = oci_core_network_security_group.control_plane.id
+  direction                 = "INGRESS"
+  protocol                  = "17"
+  source                    = "108.181.38.64/27"
+  source_type               = "CIDR_BLOCK"
+  description               = "TFTP for PXE boot - locked to colo /27"
+
+  udp_options {
+    destination_port_range {
+      min = 69
+      max = 69
     }
   }
 }

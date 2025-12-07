@@ -1,0 +1,80 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: capi-operator
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://kubernetes-sigs.github.io/cluster-api-operator
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cluster-api-operator
+  namespace: capm3-system
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: cluster-api-operator
+      version: "0.13.*"
+      sourceRef:
+        kind: HelmRepository
+        name: capi-operator
+        namespace: flux-system
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    # Core Cluster API configuration
+    core:
+      enabled: true
+      version: v1.8.4
+
+    # Bootstrap provider (Kubeadm)
+    bootstrap:
+      enabled: true
+      providers:
+        - name: kubeadm
+          version: v1.8.4
+
+    # Control plane provider (Kubeadm)
+    controlPlane:
+      enabled: true
+      providers:
+        - name: kubeadm
+          version: v1.8.4
+
+    # Infrastructure provider (Metal3)
+    infrastructure:
+      enabled: true
+      providers:
+        - name: metal3
+          version: v1.8.2
+
+    # IPAM provider (in-cluster)
+    ipam:
+      enabled: true
+      providers:
+        - name: in-cluster
+          version: v0.1.0
+
+    # Resource limits
+    resources:
+      limits:
+        memory: 512Mi
+        cpu: 500m
+      requests:
+        memory: 256Mi
+        cpu: 100m
+
+    # Manager configuration
+    manager:
+      featureGates:
+        ClusterTopology: true
+        MachinePool: true
