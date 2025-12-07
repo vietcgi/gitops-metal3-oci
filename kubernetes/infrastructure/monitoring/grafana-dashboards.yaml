@@ -11,16 +11,16 @@ data:
       "dashboard": {
         "id": null,
         "title": "Hardware Provisioning",
-        "tags": ["tinkerbell", "bare-metal", "provisioning"],
+        "tags": ["metal3", "ironic", "bare-metal", "provisioning"],
         "timezone": "browser",
         "panels": [
           {
             "id": 1,
-            "title": "Provisioning Status",
+            "title": "BareMetalHosts Total",
             "type": "stat",
             "targets": [
               {
-                "expr": "sum(tink_workflow_status_total{state=\"complete\"})",
+                "expr": "count(baremetal_operator_host_info)",
                 "refId": "A"
               }
             ],
@@ -42,45 +42,46 @@ data:
           },
           {
             "id": 2,
-            "title": "Provisioning Workflow Status",
+            "title": "Provisioning State",
             "type": "timeseries",
             "targets": [
               {
-                "expr": "rate(tink_workflow_status_total[5m])",
-                "legendFormat": "{{state}}",
+                "expr": "count by (provisioning_state) (baremetal_operator_host_info)",
+                "legendFormat": "{{provisioning_state}}",
                 "refId": "A"
               }
             ]
           },
           {
             "id": 3,
-            "title": "Hardware Health",
-            "type": "stat",
+            "title": "Hosts by Status",
+            "type": "piechart",
             "targets": [
               {
-                "expr": "count(tink_hardware_status)",
+                "expr": "count by (operational_status) (baremetal_operator_host_info)",
+                "legendFormat": "{{operational_status}}",
                 "refId": "A"
               }
             ],
             "fieldConfig": {
               "defaults": {
                 "color": {
-                  "mode": "thresholds"
-                },
-                "thresholds": {
-                  "steps": [
-                    {
-                      "color": "green",
-                      "value": null
-                    },
-                    {
-                      "color": "red",
-                      "value": 80
-                    }
-                  ]
+                  "mode": "palette-classic"
                 }
               }
             }
+          },
+          {
+            "id": 4,
+            "title": "Ironic API Requests",
+            "type": "timeseries",
+            "targets": [
+              {
+                "expr": "rate(ironic_api_requests_total[5m])",
+                "legendFormat": "{{method}} {{status}}",
+                "refId": "A"
+              }
+            ]
           }
         ]
       }

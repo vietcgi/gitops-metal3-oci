@@ -1,7 +1,13 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+
+namespace: baremetal-operator-system
+
 resources:
   - namespace.yaml
-  - ironic-release.yaml
-  - baremetal-operator-release.yaml
-  - cluster-api-release.yaml
+  - ironic-configmap.yaml
+  - ironic-deployment.yaml
+  - baremetal-operator.yaml
+
+# Use remote base from official Metal3 repo for CRDs
+# This ensures we get the latest BareMetalHost CRD

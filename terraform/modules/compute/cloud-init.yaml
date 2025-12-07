@@ -1,6 +1,6 @@
 #cloud-config
 #
-# Cloud-init configuration for Metal Foundry control plane
+# Cloud-init configuration for Metal3 OCI control plane
 # This prepares the system and optionally runs the cluster setup
 #
 
@@ -36,10 +36,10 @@ packages:
 
 # Configure system settings
 write_files:
-  # Metal Foundry comprehensive sysctl settings (from setup-cluster.sh)
-  - path: /etc/sysctl.d/99-metal-foundry.conf
+  # Metal3 OCI comprehensive sysctl settings (from setup-cluster.sh)
+  - path: /etc/sysctl.d/99-metal3-oci.conf
     content: |
-      # Metal Foundry - Production System Tuning
+      # Metal3 OCI - Production System Tuning
       # Based on ansible-infra common role
 
       # Network performance - Optimized for high throughput
@@ -93,10 +93,10 @@ write_files:
       fs.inotify.max_user_watches = 524288
       fs.inotify.max_user_instances = 512
 
-  # Metal Foundry file limits
-  - path: /etc/security/limits.d/99-metal-foundry.conf
+  # Metal3 OCI file limits
+  - path: /etc/security/limits.d/99-metal3-oci.conf
     content: |
-      # Metal Foundry - Production File Limits
+      # Metal3 OCI - Production File Limits
       # Based on ansible-infra common role
 
       # File descriptor limits
@@ -116,7 +116,7 @@ write_files:
       * hard memlock unlimited
 
   # Systemd limits
-  - path: /etc/systemd/system.conf.d/99-metal-foundry.conf
+  - path: /etc/systemd/system.conf.d/99-metal3-oci.conf
     content: |
       [Manager]
       DefaultLimitNOFILE=1039999
@@ -126,7 +126,7 @@ write_files:
   # Chrony NTP configuration
   - path: /etc/chrony/chrony.conf
     content: |
-      # Metal Foundry - Chrony NTP Configuration
+      # Metal3 OCI - Chrony NTP Configuration
       # Use Oracle Cloud NTP servers (OCI instances)
       server 169.254.169.123 prefer iburst minpoll 4 maxpoll 4
 
@@ -189,19 +189,19 @@ write_files:
       [Install]
       WantedBy=multi-user.target
 
-  # Ironic HTTP boot proxy service
+  # Ironic HTTP server proxy service (for IPA images)
   - path: /etc/systemd/system/ironic-http-proxy.service
     content: |
       [Unit]
-      Description=Ironic HTTP Boot Proxy (socat)
+      Description=Ironic HTTP Server Proxy (socat)
       Documentation=https://metal3.io
       After=network.target k3s.service
       Wants=k3s.service
 
       [Service]
       Type=simple
-      ExecStartPre=/bin/bash -c 'until kubectl get svc ironic-http -n baremetal-operator-system -o jsonpath="{.spec.clusterIP}" 2>/dev/null | grep -q "^10\."; do sleep 5; done'
-      ExecStart=/bin/bash -c 'HTTP_IP=$(kubectl get svc ironic-http -n baremetal-operator-system -o jsonpath="{.spec.clusterIP}" 2>/dev/null || echo "10.43.100.3"); exec /usr/bin/socat TCP-LISTEN:8080,fork,reuseaddr TCP:$${HTTP_IP}:8080'
+      ExecStartPre=/bin/bash -c 'until kubectl get svc ironic -n baremetal-operator-system -o jsonpath="{.spec.clusterIP}" 2>/dev/null | grep -q "^10\."; do sleep 5; done'
+      ExecStart=/bin/bash -c 'HTTP_IP=$(kubectl get svc ironic -n baremetal-operator-system -o jsonpath="{.spec.clusterIP}" 2>/dev/null || echo "10.43.100.1"); exec /usr/bin/socat TCP-LISTEN:6180,fork,reuseaddr TCP:$${HTTP_IP}:6180'
       Restart=always
       RestartSec=5
 
@@ -227,14 +227,14 @@ write_files:
         - "127.0.0.1"
 
   # Setup script with retry logic
-  - path: /usr/local/bin/metal-foundry-setup
+  - path: /usr/local/bin/metal3-oci-setup
     permissions: '0755'
     content: |
       #!/bin/bash
       set -euo pipefail
 
-      SCRIPT_URL="https://raw.githubusercontent.com/vietcgi/gitops-metal-foundry/main/scripts/setup-cluster.sh"
-      LOG_FILE="/var/log/metal-foundry-setup.log"
+      SCRIPT_URL="https://raw.githubusercontent.com/vietcgi/gitops-metal3-oci/main/scripts/setup-cluster.sh"
+      LOG_FILE="/var/log/metal3-oci-setup.log"
       MAX_RETRIES=5
       RETRY_DELAY=30
 
@@ -261,7 +261,7 @@ write_files:
       }
 
       main() {
-        log "=== Metal Foundry Setup Starting ==="
+        log "=== Metal3 OCI Setup Starting ==="
 
         # Download setup script
         if ! download_with_retry "$SCRIPT_URL" "/tmp/setup-cluster.sh"; then
@@ -277,10 +277,10 @@ write_files:
         log "Running setup script..."
         if /tmp/setup-cluster.sh; then
           log "=== Setup Complete ==="
-          echo "complete" > /var/log/metal-foundry-status
+          echo "complete" > /var/log/metal3-oci-status
         else
           log "ERROR: Setup script failed"
-          echo "failed" > /var/log/metal-foundry-status
+          echo "failed" > /var/log/metal3-oci-status
           exit 1
         fi
       }
@@ -327,7 +327,7 @@ runcmd:
   # Metal3/Ironic ports - locked to colo /27 subnet
   - iptables -I INPUT 14 -p tcp --dport 6385 -j ACCEPT
   - iptables -I INPUT 15 -s 108.181.38.64/27 -p tcp --dport 5050 -j ACCEPT
-  - iptables -I INPUT 16 -s 108.181.38.64/27 -p tcp --dport 8080 -j ACCEPT
+  - iptables -I INPUT 16 -s 108.181.38.64/27 -p tcp --dport 6180 -j ACCEPT
   - iptables -I INPUT 17 -s 108.181.38.64/27 -p udp --dport 69 -j ACCEPT
   - iptables -A FORWARD -j ACCEPT
   - netfilter-persistent save 2>/dev/null || true
@@ -343,7 +343,7 @@ runcmd:
 %{ endif }
 
   # Run cluster setup
-  - /usr/local/bin/metal-foundry-setup
+  - /usr/local/bin/metal3-oci-setup
 
   # Enable Metal3/Ironic proxies (after k3s is running)
   - systemctl daemon-reload
@@ -355,13 +355,13 @@ runcmd:
   - systemctl start ironic-http-proxy.service || true
 
 final_message: |
-  Metal Foundry cloud-init complete. Elapsed time: $UPTIME seconds.
+  Metal3 OCI cloud-init complete. Elapsed time: $UPTIME seconds.
 
   Check setup status:
-    cat /var/log/metal-foundry-status
+    cat /var/log/metal3-oci-status
 
   View setup logs:
-    sudo tail -f /var/log/metal-foundry-setup.log
+    sudo tail -f /var/log/metal3-oci-setup.log
 
   If setup failed, run manually:
-    sudo /usr/local/bin/metal-foundry-setup
+    sudo /usr/local/bin/metal3-oci-setup

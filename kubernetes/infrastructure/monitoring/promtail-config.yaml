@@ -37,7 +37,7 @@ data:
     - job_name: kubernetes-pods-app
       pipeline_stages:
         - match:
-            selector: '{app="tinkerbell"}'
+            selector: '{app=~"ironic|baremetal-operator"}'
             stages:
               - multiline:
                   firstline: '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}'

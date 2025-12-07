@@ -1,0 +1,531 @@
+---
+# BareMetalHost CRD - defines the bare metal server resource
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: baremetalhosts.metal3.io
+  labels:
+    app.kubernetes.io/name: metal3
+spec:
+  group: metal3.io
+  names:
+    kind: BareMetalHost
+    listKind: BareMetalHostList
+    plural: baremetalhosts
+    shortNames:
+      - bmh
+      - bmhost
+    singular: baremetalhost
+  scope: Namespaced
+  versions:
+    - additionalPrinterColumns:
+        - description: Operational status
+          jsonPath: .status.operationalStatus
+          name: Status
+          type: string
+        - description: Provisioning status
+          jsonPath: .status.provisioning.state
+          name: Provisioning Status
+          type: string
+        - description: Consumer using this host
+          jsonPath: .spec.consumerRef.name
+          name: Consumer
+          type: string
+        - description: Address of management controller
+          jsonPath: .spec.bmc.address
+          name: BMC
+          type: string
+        - description: Hardware profile
+          jsonPath: .status.hardwareProfile
+          name: Hardware Profile
+          type: string
+        - description: Whether the host is online or not
+          jsonPath: .spec.online
+          name: Online
+          type: string
+        - description: Whether the host has any errors
+          jsonPath: .status.errorMessage
+          name: Error
+          type: string
+        - jsonPath: .metadata.creationTimestamp
+          name: Age
+          type: date
+      name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: BareMetalHost is the Schema for the baremetalhosts API
+          type: object
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              properties:
+                online:
+                  type: boolean
+                bootMACAddress:
+                  type: string
+                  pattern: '[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}'
+                bootMode:
+                  type: string
+                  enum:
+                    - UEFI
+                    - legacy
+                bmc:
+                  type: object
+                  properties:
+                    address:
+                      type: string
+                    credentialsName:
+                      type: string
+                    disableCertificateVerification:
+                      type: boolean
+                  required:
+                    - address
+                    - credentialsName
+                consumerRef:
+                  type: object
+                  properties:
+                    apiVersion:
+                      type: string
+                    kind:
+                      type: string
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                image:
+                  type: object
+                  properties:
+                    url:
+                      type: string
+                    checksum:
+                      type: string
+                    checksumType:
+                      type: string
+                      enum:
+                        - md5
+                        - sha256
+                        - sha512
+                    format:
+                      type: string
+                      enum:
+                        - raw
+                        - qcow2
+                        - vdi
+                        - vmdk
+                        - live-iso
+                rootDeviceHints:
+                  type: object
+                  properties:
+                    deviceName:
+                      type: string
+                    hctl:
+                      type: string
+                    model:
+                      type: string
+                    vendor:
+                      type: string
+                    serialNumber:
+                      type: string
+                    minSizeGigabytes:
+                      type: integer
+                    wwn:
+                      type: string
+                    wwnWithExtension:
+                      type: string
+                    wwnVendorExtension:
+                      type: string
+                    rotational:
+                      type: boolean
+                userData:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                networkData:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                metaData:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    namespace:
+                      type: string
+                description:
+                  type: string
+                hardwareProfile:
+                  type: string
+                externallyProvisioned:
+                  type: boolean
+                automatedCleaningMode:
+                  type: string
+                  enum:
+                    - metadata
+                    - disabled
+            status:
+              type: object
+              properties:
+                errorCount:
+                  type: integer
+                errorMessage:
+                  type: string
+                errorType:
+                  type: string
+                goodCredentials:
+                  type: object
+                  properties:
+                    credentials:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        namespace:
+                          type: string
+                    credentialsVersion:
+                      type: string
+                hardware:
+                  type: object
+                  properties:
+                    cpu:
+                      type: object
+                      properties:
+                        arch:
+                          type: string
+                        count:
+                          type: integer
+                        model:
+                          type: string
+                    firmware:
+                      type: object
+                      properties:
+                        bios:
+                          type: object
+                          properties:
+                            date:
+                              type: string
+                            vendor:
+                              type: string
+                            version:
+                              type: string
+                    hostname:
+                      type: string
+                    nics:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          ip:
+                            type: string
+                          mac:
+                            type: string
+                          model:
+                            type: string
+                          name:
+                            type: string
+                          pxe:
+                            type: boolean
+                          speedGbps:
+                            type: integer
+                          vlanId:
+                            type: integer
+                    ramMebibytes:
+                      type: integer
+                    storage:
+                      type: array
+                      items:
+                        type: object
+                        properties:
+                          hctl:
+                            type: string
+                          model:
+                            type: string
+                          name:
+                            type: string
+                          rotational:
+                            type: boolean
+                          serialNumber:
+                            type: string
+                          sizeBytes:
+                            type: integer
+                          vendor:
+                            type: string
+                          wwn:
+                            type: string
+                          wwnVendorExtension:
+                            type: string
+                          wwnWithExtension:
+                            type: string
+                    systemVendor:
+                      type: object
+                      properties:
+                        manufacturer:
+                          type: string
+                        productName:
+                          type: string
+                        serialNumber:
+                          type: string
+                hardwareProfile:
+                  type: string
+                lastUpdated:
+                  type: string
+                  format: date-time
+                operationalStatus:
+                  type: string
+                operationHistory:
+                  type: object
+                  properties:
+                    deprovision:
+                      type: object
+                      properties:
+                        end:
+                          type: string
+                          format: date-time
+                        start:
+                          type: string
+                          format: date-time
+                    inspect:
+                      type: object
+                      properties:
+                        end:
+                          type: string
+                          format: date-time
+                        start:
+                          type: string
+                          format: date-time
+                    provision:
+                      type: object
+                      properties:
+                        end:
+                          type: string
+                          format: date-time
+                        start:
+                          type: string
+                          format: date-time
+                    register:
+                      type: object
+                      properties:
+                        end:
+                          type: string
+                          format: date-time
+                        start:
+                          type: string
+                          format: date-time
+                poweredOn:
+                  type: boolean
+                provisioning:
+                  type: object
+                  properties:
+                    ID:
+                      type: string
+                    bootMode:
+                      type: string
+                    image:
+                      type: object
+                      properties:
+                        url:
+                          type: string
+                        checksum:
+                          type: string
+                        checksumType:
+                          type: string
+                        format:
+                          type: string
+                    rootDeviceHints:
+                      type: object
+                      properties:
+                        deviceName:
+                          type: string
+                        hctl:
+                          type: string
+                        model:
+                          type: string
+                        vendor:
+                          type: string
+                        serialNumber:
+                          type: string
+                        minSizeGigabytes:
+                          type: integer
+                        wwn:
+                          type: string
+                        rotational:
+                          type: boolean
+                    state:
+                      type: string
+                triedCredentials:
+                  type: object
+                  properties:
+                    credentials:
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        namespace:
+                          type: string
+                    credentialsVersion:
+                      type: string
+      served: true
+      storage: true
+      subresources:
+        status: {}
+---
+# Baremetal Operator Service Account
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: baremetal-operator-controller-manager
+  namespace: baremetal-operator-system
+---
+# Baremetal Operator ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: baremetal-operator-manager-role
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - update
+      - watch
+  - apiGroups:
+      - metal3.io
+    resources:
+      - baremetalhosts
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - metal3.io
+    resources:
+      - baremetalhosts/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - metal3.io
+    resources:
+      - baremetalhosts/status
+    verbs:
+      - get
+      - patch
+      - update
+---
+# ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: baremetal-operator-manager-rolebinding
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: baremetal-operator-manager-role
+subjects:
+  - kind: ServiceAccount
+    name: baremetal-operator-controller-manager
+    namespace: baremetal-operator-system
+---
+# Baremetal Operator Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: baremetal-operator-controller-manager
+  namespace: baremetal-operator-system
+  labels:
+    app.kubernetes.io/name: baremetal-operator
+    control-plane: controller-manager
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      control-plane: controller-manager
+  template:
+    metadata:
+      labels:
+        control-plane: controller-manager
+    spec:
+      serviceAccountName: baremetal-operator-controller-manager
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: manager
+          image: quay.io/metal3-io/baremetal-operator:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - --metrics-addr=127.0.0.1:8085
+            - --enable-leader-election
+          env:
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          envFrom:
+            - configMapRef:
+                name: ironic-bmo-configmap
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - containerPort: 9443
+              name: webhook-server
+              protocol: TCP
+            - containerPort: 8085
+              name: metrics
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 256Mi
+      terminationGracePeriodSeconds: 10

@@ -1,7 +1,7 @@
 #=============================================================================
 # VCN Module - Virtual Cloud Network
 #
-# Creates networking infrastructure for Metal Foundry.
+# Creates networking infrastructure for Metal3 OCI.
 # All resources are Always Free tier.
 #=============================================================================
 
@@ -218,16 +218,16 @@ resource "oci_core_security_list" "public" {
     }
   }
 
-  # Ingress - Ironic iPXE/HTTP boot (restricted to provisioning network)
+  # Ingress - Ironic HTTP server for images (restricted to provisioning network)
   ingress_security_rules {
     protocol    = "6" # TCP
     source      = "108.181.38.64/27"
     stateless   = false
-    description = "Ironic HTTP boot - locked to colo /27"
+    description = "Ironic HTTP images - locked to colo /27"
 
     tcp_options {
-      min = 8080
-      max = 8080
+      min = 6180
+      max = 6180
     }
   }
 
@@ -439,12 +439,12 @@ resource "oci_core_network_security_group_security_rule" "control_plane_ironic_h
   protocol                  = "6"
   source                    = "108.181.38.64/27"
   source_type               = "CIDR_BLOCK"
-  description               = "Ironic HTTP boot - locked to colo /27"
+  description               = "Ironic HTTP images - locked to colo /27"
 
   tcp_options {
     destination_port_range {
-      min = 8080
-      max = 8080
+      min = 6180
+      max = 6180
     }
   }
 }

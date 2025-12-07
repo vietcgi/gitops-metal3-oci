@@ -1,0 +1,225 @@
+---
+# Ironic Service - exposes Ironic API and Inspector
+apiVersion: v1
+kind: Service
+metadata:
+  name: ironic
+  namespace: baremetal-operator-system
+  labels:
+    app.kubernetes.io/name: ironic
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  ports:
+    - name: api
+      port: 6385
+      targetPort: 6385
+      protocol: TCP
+    - name: inspector
+      port: 5050
+      targetPort: 5050
+      protocol: TCP
+    - name: httpd
+      port: 6180
+      targetPort: 6180
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: ironic
+---
+# Ironic Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ironic
+  namespace: baremetal-operator-system
+  labels:
+    app.kubernetes.io/name: ironic
+    app.kubernetes.io/component: provisioning
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ironic
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ironic
+    spec:
+      hostNetwork: false
+      serviceAccountName: ironic
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 994
+        seccompProfile:
+          type: RuntimeDefault
+
+      initContainers:
+        # Download IPA images
+        - name: ironic-ipa-downloader
+          image: quay.io/metal3-io/ironic-ipa-downloader:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 997
+            runAsGroup: 994
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+          envFrom:
+            - configMapRef:
+                name: ironic-bmo-configmap
+
+      containers:
+        # Ironic API and Conductor
+        - name: ironic
+          image: quay.io/metal3-io/ironic:latest
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 997
+            runAsGroup: 994
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - containerPort: 6385
+              name: api
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: ironic-bmo-configmap
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+          livenessProbe:
+            httpGet:
+              path: /v1
+              port: 6385
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /v1
+              port: 6385
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          resources:
+            limits:
+              memory: 2Gi
+              cpu: "2"
+            requests:
+              memory: 1Gi
+              cpu: 500m
+
+        # Ironic Inspector
+        - name: ironic-inspector
+          image: quay.io/metal3-io/ironic:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/runironic-inspector"]
+          securityContext:
+            runAsUser: 997
+            runAsGroup: 994
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - containerPort: 5050
+              name: inspector
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: ironic-bmo-configmap
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+          livenessProbe:
+            httpGet:
+              path: /v1
+              port: 5050
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            limits:
+              memory: 1Gi
+              cpu: "1"
+            requests:
+              memory: 512Mi
+              cpu: 250m
+
+        # HTTP server for images
+        - name: ironic-httpd
+          image: quay.io/metal3-io/ironic:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/runhttpd"]
+          securityContext:
+            runAsUser: 997
+            runAsGroup: 994
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - containerPort: 6180
+              name: httpd
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: ironic-bmo-configmap
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 6180
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            limits:
+              memory: 512Mi
+              cpu: 500m
+            requests:
+              memory: 256Mi
+              cpu: 100m
+
+        # Log watcher
+        - name: ironic-log-watch
+          image: quay.io/metal3-io/ironic:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/runlogwatch.sh"]
+          securityContext:
+            runAsUser: 997
+            runAsGroup: 994
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: shared
+              mountPath: /shared
+          resources:
+            limits:
+              memory: 128Mi
+              cpu: 100m
+            requests:
+              memory: 64Mi
+              cpu: 50m
+
+      volumes:
+        - name: shared
+          emptyDir: {}
+---
+# ServiceAccount for Ironic
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ironic
+  namespace: baremetal-operator-system

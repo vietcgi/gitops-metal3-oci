@@ -1,0 +1,53 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ironic-bmo-configmap
+  namespace: baremetal-operator-system
+data:
+  # Ironic endpoint - internal service
+  IRONIC_ENDPOINT: "http://ironic.baremetal-operator-system.svc.cluster.local:6385/v1"
+
+  # Ironic Inspector endpoint
+  IRONIC_INSPECTOR_ENDPOINT: "http://ironic.baremetal-operator-system.svc.cluster.local:5050/v1"
+
+  # Provisioning network configuration
+  # Update these values for your environment
+  PROVISIONING_IP: ""
+  PROVISIONING_INTERFACE: "eth0"
+  PROVISIONING_CIDR: "24"
+
+  # DHCP range for provisioning network
+  DHCP_RANGE: "10.0.2.100,10.0.2.200"
+
+  # Deploy image URLs - IPA (Ironic Python Agent)
+  # These are fetched at runtime by ironic-ipa-downloader
+  DEPLOY_KERNEL_URL: "http://ironic.baremetal-operator-system.svc.cluster.local:6180/images/ironic-python-agent.kernel"
+  DEPLOY_RAMDISK_URL: "http://ironic.baremetal-operator-system.svc.cluster.local:6180/images/ironic-python-agent.initramfs"
+
+  # HTTP server for serving images
+  HTTP_PORT: "6180"
+
+  # Enable iPXE boot
+  USE_IRONIC_INSPECTOR: "true"
+  IRONIC_FAST_TRACK: "true"
+
+  # Disable TLS for internal communication (use network policies instead)
+  IRONIC_INSECURE: "true"
+
+  # Authentication mode: noauth or http_basic
+  # For production, use http_basic with proper secrets
+  IRONIC_AUTH_STRATEGY: "noauth"
+
+  # Log level
+  IRONIC_LOG_LEVEL: "info"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ironic-htpasswd
+  namespace: baremetal-operator-system
+data:
+  # For http_basic auth, add htpasswd entries here
+  # Generate with: htpasswd -n -b -B username password
+  htpasswd: ""

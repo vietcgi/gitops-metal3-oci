@@ -1,6 +1,11 @@
 # Example BareMetalHost for Metal3
-# Copy and customize this for your bare metal servers
+#
+# Copy and customize this for your bare metal servers.
+# See: https://metal3.io/documentation.html
+#
 ---
+# BMC Credentials Secret
+# Store BMC (IPMI/Redfish/iDRAC) credentials securely
 apiVersion: v1
 kind: Secret
 metadata:
@@ -9,85 +14,86 @@ metadata:
 type: Opaque
 stringData:
   username: admin
-  password: password  # Replace with actual BMC password
+  password: changeme  # Replace with actual BMC password
 ---
+# BareMetalHost Resource
+# Defines a physical server to be managed by Metal3
 apiVersion: metal3.io/v1alpha1
 kind: BareMetalHost
 metadata:
   name: example-host
   namespace: baremetal-operator-system
   labels:
-    cluster.x-k8s.io/cluster-name: my-cluster
+    # Add labels to categorize your hosts
+    role: worker
+    location: colo
 spec:
   # BMC (Baseboard Management Controller) connection
+  # Supports: ipmi://, redfish://, idrac://, ilo4://, ilo5://
   bmc:
-    # IPMI example
+    # IPMI example (older servers)
     address: ipmi://192.168.1.100
-    # Redfish example (preferred for newer servers)
+    # Redfish example (modern servers - preferred)
     # address: redfish://192.168.1.100/redfish/v1/Systems/1
-    # iDRAC example (Dell servers)
+    # Dell iDRAC example
     # address: idrac://192.168.1.100
+    # HP iLO example
+    # address: ilo5://192.168.1.100
     credentialsName: example-host-bmc-secret
     disableCertificateVerification: true
 
-  # Boot MAC address (for PXE boot)
+  # Boot MAC address - the MAC of the NIC used for PXE boot
   bootMACAddress: "00:11:22:33:44:55"
 
-  # Boot mode (UEFI or legacy)
+  # Boot mode: UEFI or legacy (BIOS)
   bootMode: UEFI
-  # bootMode: legacy  # For older BIOS-only servers
+  # bootMode: legacy  # For older BIOS-only servers like Dell R610
 
-  # Online status - set to true to make available for provisioning
+  # Set to true to make the host available for provisioning
   online: true
 
-  # Hardware profile (optional - auto-detected if not set)
-  # hardwareProfile: dell-r610
-
-  # Root device hints (optional - specify which disk to install to)
+  # Root device hints - specify which disk to install the OS to
+  # Use one or more of these to identify the correct disk
   rootDeviceHints:
+    # By device name
     deviceName: /dev/sda
-    # Or by size
+    # By minimum size (useful when you have mixed disk sizes)
     # minSizeGigabytes: 100
-    # Or by model
+    # By model name
     # model: "INTEL SSD"
+    # By serial number
+    # serialNumber: "ABC123"
+    # By rotational type (false = SSD, true = HDD)
+    # rotational: false
 
-  # Inspection disabled - set to true to skip hardware inspection
+  # Optional: Disable hardware inspection
+  # Set to true if you want to skip the inspection phase
   # externallyProvisioned: false
 
-  # Firmware settings (optional)
-  # firmware:
-  #   simultaneousMultithreadingEnabled: true
-  #   virtualizationEnabled: true
-
-  # RAID configuration (optional)
-  # raid:
-  #   hardwareRAIDVolumes:
-  #     - name: root
-  #       level: "1"
-  #       sizeGibibytes: 100
-  #       physicalDisks:
-  #         - /dev/sda
-  #         - /dev/sdb
-
-  # Consumer reference - set automatically by Cluster API
-  # consumerRef:
-  #   apiVersion: cluster.x-k8s.io/v1beta1
-  #   kind: Machine
-  #   name: my-machine
-  #   namespace: default
-
-  # Image to deploy
+  # OS Image to deploy
+  # Uses cloud images that work with cloud-init
   image:
+    # Ubuntu 24.04 LTS cloud image
     url: https://cloud-images.ubuntu.com/releases/24.04/release/ubuntu-24.04-server-cloudimg-amd64.img
     checksum: https://cloud-images.ubuntu.com/releases/24.04/release/SHA256SUMS
     checksumType: sha256
     format: qcow2
+    # Alternative: Ubuntu 22.04 LTS
+    # url: https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server-cloudimg-amd64.img
+    # checksum: https://cloud-images.ubuntu.com/releases/22.04/release/SHA256SUMS
 
-  # User data (cloud-init)
+  # User data (cloud-init configuration)
   userData:
     name: example-host-userdata
     namespace: baremetal-operator-system
+
+  # Optional: Network data (for complex network configurations)
+  # networkData:
+  #   name: example-host-networkdata
+  #   namespace: baremetal-operator-system
 ---
+# Cloud-init User Data Secret
+# Customize the OS after installation
 apiVersion: v1
 kind: Secret
 metadata:
@@ -98,14 +104,34 @@ stringData:
   userData: |
     #cloud-config
     hostname: example-host
+
+    # Create user with SSH access
     users:
       - name: ubuntu
         sudo: ALL=(ALL) NOPASSWD:ALL
         shell: /bin/bash
         ssh_authorized_keys:
-          - ssh-rsa YOUR_SSH_PUBLIC_KEY
+          - ssh-rsa YOUR_SSH_PUBLIC_KEY_HERE
+
+    # Update packages on first boot
     package_update: true
+    package_upgrade: true
+
+    # Install common packages
     packages:
       - curl
       - wget
       - git
+      - vim
+      - htop
+
+    # Run commands on first boot
+    runcmd:
+      # Disable swap (required for Kubernetes)
+      - swapoff -a
+      - sed -i '/swap/d' /etc/fstab
+      # Optional: Install K3s worker
+      # - curl -sfL https://get.k3s.io | K3S_URL=https://your-k3s-server:6443 K3S_TOKEN=your-token sh -
+
+    # Final message
+    final_message: "Cloud-init complete. System ready."
