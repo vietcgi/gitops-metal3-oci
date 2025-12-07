@@ -53,9 +53,16 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  TF_VERSION: '1.9.8'
+  TF_VERSION: '1.5.7'
   TF_WORKING_DIR: 'terraform'
-  # Terraform provider variables
+  # S3 backend credentials (OCI Object Storage)
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  # S3 backend config (bucket stays in original region)
+  TF_STATE_BUCKET: 'metal3-oci-state'
+  TF_STATE_REGION: ${{ secrets.OCI_STATE_REGION }}
+  TF_STATE_ENDPOINT: 'https://${{ secrets.OCI_NAMESPACE }}.compat.objectstorage.${{ secrets.OCI_STATE_REGION }}.oraclecloud.com'
+  # Terraform provider variables (lowercase env var, uppercase secret)
   TF_VAR_tenancy_ocid: ${{ secrets.TF_VAR_TENANCY_OCID }}
   TF_VAR_user_ocid: ${{ secrets.TF_VAR_USER_OCID }}
   TF_VAR_fingerprint: ${{ secrets.TF_VAR_FINGERPRINT }}
@@ -84,7 +91,11 @@ jobs:
         working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform Init
-        run: terraform init
+        run: |
+          terraform init \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="region=$TF_STATE_REGION" \
+            -backend-config="endpoint=$TF_STATE_ENDPOINT"
         working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform Validate
@@ -141,7 +152,11 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Init
-        run: terraform init
+        run: |
+          terraform init \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="region=$TF_STATE_REGION" \
+            -backend-config="endpoint=$TF_STATE_ENDPOINT"
         working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform Apply
@@ -167,7 +182,11 @@ jobs:
           terraform_version: ${{ env.TF_VERSION }}
 
       - name: Terraform Init
-        run: terraform init
+        run: |
+          terraform init \
+            -backend-config="bucket=$TF_STATE_BUCKET" \
+            -backend-config="region=$TF_STATE_REGION" \
+            -backend-config="endpoint=$TF_STATE_ENDPOINT"
         working-directory: ${{ env.TF_WORKING_DIR }}
 
       - name: Terraform Destroy
