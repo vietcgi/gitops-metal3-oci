@@ -1,5 +1,5 @@
 #=============================================================================
-# GitOps Metal Foundry - Main Terraform Configuration
+# GitOps Metal3 OCI - Main Terraform Configuration
 #
 # This creates the Oracle Cloud infrastructure for the control plane.
 # ALL resources use Always Free tier - $0/month guaranteed.
@@ -104,7 +104,7 @@ module "control_plane" {
   tags = local.common_tags
 }
 
-# Note: Object storage bucket (metal-foundry-state) is created outside Terraform
+# Note: Object storage bucket (metal3-oci-state) is created outside Terraform
 # because it's used for Terraform state storage (chicken-and-egg problem)
 
 #=============================================================================

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Metal Foundry - Complete Cluster Setup
+# Metal3 OCI - Complete Cluster Setup
 #
 # This script sets up a complete K3s cluster with:
 #   - K3s (Kubernetes)
@@ -23,12 +23,12 @@ export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 # Configuration
 #=============================================================================
 GITHUB_OWNER="${1:-vietcgi}"
-GITHUB_REPO="${2:-gitops-metal-foundry}"
+GITHUB_REPO="${2:-gitops-metal3-oci}"
 BRANCH="main"
 CLUSTER_PATH="kubernetes"
 REPO_URL="https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}.git"
 
-LOG_FILE="/var/log/metal-foundry-setup.log"
+LOG_FILE="/var/log/metal3-oci-setup.log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 #=============================================================================
@@ -55,7 +55,7 @@ wait_for_pods() {
 #=============================================================================
 # Main Installation
 #=============================================================================
-log_section "Metal Foundry Cluster Setup"
+log_section "Metal3 OCI Cluster Setup"
 log "GitHub: ${GITHUB_OWNER}/${GITHUB_REPO}"
 log "Branch: ${BRANCH}"
 
@@ -66,9 +66,9 @@ check_root
 #   terraform/modules/compute/cloud-init.yaml
 #
 # If running this script manually (not via cloud-init), ensure these are configured:
-#   - /etc/sysctl.d/99-metal-foundry.conf
-#   - /etc/security/limits.d/99-metal-foundry.conf
-#   - /etc/systemd/system.conf.d/99-metal-foundry.conf
+#   - /etc/sysctl.d/99-metal3-oci.conf
+#   - /etc/security/limits.d/99-metal3-oci.conf
+#   - /etc/systemd/system.conf.d/99-metal3-oci.conf
 #   - /etc/chrony/chrony.conf (or /etc/chrony.conf)
 
 #-----------------------------------------------------------------------------

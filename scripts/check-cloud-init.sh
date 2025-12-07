@@ -26,11 +26,11 @@ ssh "$SSH_USER@$SERVER_IP" "sudo cat /var/log/cloud-init-output.log | tail -100 
 
 echo
 echo "🔍 Checking if setup completed successfully..."
-ssh "$SSH_USER@$SERVER_IP" "cat /var/log/metal-foundry-status || echo 'Status file not found'"
+ssh "$SSH_USER@$SERVER_IP" "cat /var/log/metal3-oci-status || echo 'Status file not found'"
 
 echo
 echo "🔍 Checking setup logs..."
-ssh "$SSH_USER@$SERVER_IP" "sudo tail -50 /var/log/metal-foundry-setup.log || echo 'Setup log not found'"
+ssh "$SSH_USER@$SERVER_IP" "sudo tail -50 /var/log/metal3-oci-setup.log || echo 'Setup log not found'"
 
 echo
 echo "🔍 Checking if K3s was installed successfully..."

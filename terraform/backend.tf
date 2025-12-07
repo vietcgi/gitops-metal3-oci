@@ -15,7 +15,7 @@
 # terraform {
 #   backend "s3" {
 #     # OCI Object Storage uses S3-compatible API
-#     bucket   = "metal-foundry-state"
+#     bucket   = "metal3-oci-state"
 #     key      = "terraform.tfstate"
 #     region   = "us-ashburn-1"  # Change to your region
 #
@@ -44,7 +44,7 @@
 #     organization = "your-org"
 #
 #     workspaces {
-#       name = "metal-foundry"
+#       name = "metal3-oci"
 #     }
 #   }
 # }

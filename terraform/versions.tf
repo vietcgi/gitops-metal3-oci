@@ -24,7 +24,7 @@ terraform {
   # Requires Terraform 1.12+ for native OCI backend support
   backend "oci" {
     # Configured via -backend-config or environment:
-    #   -backend-config="bucket=metal-foundry-state"
+    #   -backend-config="bucket=metal3-oci-state"
     #   -backend-config="namespace=<your-namespace>"
     #   -backend-config="region=<your-region>"
     #   -backend-config="config_file_profile=<profile>"  # for local dev

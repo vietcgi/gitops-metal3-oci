@@ -32,7 +32,7 @@ output "private_subnet_id" {
   value       = module.vcn.private_subnet_id
 }
 
-# Note: State bucket (metal-foundry-state) is managed outside Terraform
+# Note: State bucket (metal3-oci-state) is managed outside Terraform
 
 # SSH command for convenience
 output "ssh_command" {
