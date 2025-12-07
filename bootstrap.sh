@@ -504,6 +504,51 @@ create_compartment() {
 }
 
 #=============================================================================
+# Step 7b: Create State Bucket
+#=============================================================================
+
+create_state_bucket() {
+    log_info "Setting up Terraform state bucket..."
+
+    BUCKET_NAME="${PROJECT_NAME}-state"
+
+    # Get namespace
+    OCI_NAMESPACE=$(oci os ns get $AUTH_FLAG --query 'data' --raw-output 2>/dev/null)
+    if [[ -z "$OCI_NAMESPACE" ]]; then
+        log_error "Could not get OCI namespace"
+        return 1
+    fi
+    log_success "Namespace: $OCI_NAMESPACE"
+
+    # Check if bucket exists
+    EXISTING_BUCKET=$(oci os bucket get $AUTH_FLAG \
+        --namespace-name "$OCI_NAMESPACE" \
+        --bucket-name "$BUCKET_NAME" \
+        --query 'data.name' \
+        --raw-output 2>/dev/null || echo "")
+
+    if [[ -n "$EXISTING_BUCKET" && "$EXISTING_BUCKET" != "null" ]]; then
+        log_info "Using existing bucket: $BUCKET_NAME"
+    else
+        log_info "Creating bucket: $BUCKET_NAME"
+        oci os bucket create $AUTH_FLAG \
+            --namespace-name "$OCI_NAMESPACE" \
+            --compartment-id "$OCI_COMPARTMENT" \
+            --name "$BUCKET_NAME" \
+            --versioning Enabled \
+            2>/dev/null || {
+            log_warn "Could not create bucket (may need manual creation)"
+        }
+    fi
+
+    # Export for later use
+    export OCI_NAMESPACE
+    export BUCKET_NAME
+
+    log_success "State bucket: $BUCKET_NAME"
+}
+
+#=============================================================================
 # Step 8: Get SSH Key
 #=============================================================================
 
@@ -568,6 +613,7 @@ main() {
     get_oci_config
     get_github_repo
     create_compartment
+    create_state_bucket
     get_ssh_key
     create_api_key
     set_github_secrets

@@ -14,8 +14,9 @@ locals {
     CostCenter  = "free-tier"
   }
 
-  # Determine if using AMD or ARM shape
-  is_arm = var.control_plane_shape == "VM.Standard.A1.Flex"
+  # Determine if using flex shape (needs ocpus/memory config)
+  is_arm  = var.control_plane_shape == "VM.Standard.A1.Flex"
+  is_flex = var.control_plane_shape == "VM.Standard.A1.Flex"
 }
 
 # Note: ubuntu_image_id local is defined below after data sources
@@ -27,6 +28,21 @@ locals {
 # Get availability domains
 data "oci_identity_availability_domains" "ads" {
   compartment_id = var.tenancy_ocid
+}
+
+# Random AD selection - each apply picks a random AD
+resource "random_integer" "ad_index" {
+  min = 0
+  max = length(data.oci_identity_availability_domains.ads.availability_domains) - 1
+
+  keepers = {
+    # Re-randomize when instance doesn't exist (destroyed or first run)
+    timestamp = timestamp()
+  }
+
+  lifecycle {
+    ignore_changes = [keepers]
+  }
 }
 
 # Get latest Ubuntu LTS image compatible with shape
@@ -79,9 +95,9 @@ module "control_plane" {
   source = "./modules/compute"
 
   compartment_id = var.compartment_ocid
-  # Use modulo to handle regions with fewer ADs than requested index
+  # Use random AD selection, or explicit index if provided
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains[
-    var.availability_domain_index % length(data.oci_identity_availability_domains.ads.availability_domains)
+    var.availability_domain_index != null ? var.availability_domain_index : random_integer.ad_index.result
   ].name
   project_name = var.project_name
   subnet_id    = module.vcn.public_subnet_id
@@ -89,8 +105,8 @@ module "control_plane" {
 
   # Instance configuration
   shape          = var.control_plane_shape
-  ocpus          = local.is_arm ? var.control_plane_ocpus : null
-  memory_gb      = local.is_arm ? var.control_plane_memory_gb : null
+  ocpus          = local.is_flex ? var.control_plane_ocpus : null
+  memory_gb      = local.is_flex ? var.control_plane_memory_gb : null
   image_id       = local.ubuntu_image_id
   ssh_public_key = var.ssh_public_key
 

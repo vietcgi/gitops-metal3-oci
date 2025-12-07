@@ -16,7 +16,8 @@ terraform {
 }
 
 locals {
-  is_arm = var.shape == "VM.Standard.A1.Flex"
+  is_arm  = var.shape == "VM.Standard.A1.Flex"
+  is_flex = var.shape == "VM.Standard.A1.Flex"
 }
 
 #-----------------------------------------------------------------------------
@@ -48,9 +49,9 @@ resource "oci_core_instance" "control_plane" {
 
   shape = var.shape
 
-  # Shape config only for flexible shapes (A1.Flex)
+  # Shape config only for flexible shapes (A1.Flex, E4.Flex)
   dynamic "shape_config" {
-    for_each = local.is_arm ? [1] : []
+    for_each = local.is_flex ? [1] : []
     content {
       ocpus         = var.ocpus
       memory_in_gbs = var.memory_gb
