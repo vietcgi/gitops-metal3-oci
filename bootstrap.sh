@@ -477,7 +477,7 @@ set_github_secrets() {
 create_compartment() {
     log_info "Setting up OCI compartment..."
 
-    PROJECT_NAME="${PROJECT_NAME:-metal-foundry}"
+    PROJECT_NAME="${PROJECT_NAME:-metal3-oci}"
 
     # Set auth flag based on session or API key
     AUTH_FLAG=""
