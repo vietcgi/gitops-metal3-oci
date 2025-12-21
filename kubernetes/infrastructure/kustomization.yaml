@@ -22,6 +22,5 @@ resources:
   # Registry
   - harbor
   # Bare metal provisioning (Metal3/Ironic)
-  # NOTE: Disabled - Metal3/Ironic images are x86 only, not compatible with ARM control plane
-  # TODO: Build multi-arch images or run Ironic on x86 workers
-  # - metal3
+  # Using ARM64 images built from PR #826 (https://github.com/metal3-io/ironic-image/pull/826)
+  - metal3

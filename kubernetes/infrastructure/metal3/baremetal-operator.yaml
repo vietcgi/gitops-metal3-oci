@@ -480,7 +480,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: manager
-          image: quay.io/metal3-io/baremetal-operator:latest
+          image: registry.local-registry.svc.cluster.local:5000/metal3-io/baremetal-operator:arm64
           imagePullPolicy: IfNotPresent
           args:
             - --metrics-addr=127.0.0.1:8085

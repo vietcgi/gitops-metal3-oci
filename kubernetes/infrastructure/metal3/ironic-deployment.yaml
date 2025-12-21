@@ -58,7 +58,7 @@ spec:
       initContainers:
         # Download IPA images
         - name: ironic-ipa-downloader
-          image: quay.io/metal3-io/ironic-ipa-downloader:latest
+          image: registry.local-registry.svc.cluster.local:5000/metal3-io/ironic-ipa-downloader:arm64
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsUser: 997
@@ -77,7 +77,7 @@ spec:
       containers:
         # Ironic API and Conductor
         - name: ironic
-          image: quay.io/metal3-io/ironic:latest
+          image: registry.local-registry.svc.cluster.local:5000/metal3-io/ironic:arm64
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsUser: 997
@@ -120,7 +120,7 @@ spec:
 
         # Ironic Inspector
         - name: ironic-inspector
-          image: quay.io/metal3-io/ironic:latest
+          image: registry.local-registry.svc.cluster.local:5000/metal3-io/ironic:arm64
           imagePullPolicy: IfNotPresent
           command: ["/bin/runironic-inspector"]
           securityContext:
@@ -156,7 +156,7 @@ spec:
 
         # HTTP server for images
         - name: ironic-httpd
-          image: quay.io/metal3-io/ironic:latest
+          image: registry.local-registry.svc.cluster.local:5000/metal3-io/ironic:arm64
           imagePullPolicy: IfNotPresent
           command: ["/bin/runhttpd"]
           securityContext:
@@ -192,7 +192,7 @@ spec:
 
         # Log watcher
         - name: ironic-log-watch
-          image: quay.io/metal3-io/ironic:latest
+          image: registry.local-registry.svc.cluster.local:5000/metal3-io/ironic:arm64
           imagePullPolicy: IfNotPresent
           command: ["/bin/runlogwatch.sh"]
           securityContext:
