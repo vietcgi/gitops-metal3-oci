@@ -15,3 +15,10 @@ ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC5/lrhHAQdTRfppzfA7Emn/h
 
 # Project name
 project_name = "metal3-oci"
+
+# OCI config profile (must match backend profile)
+oci_config_profile = "DEFAULT"
+
+# Instance shape config
+control_plane_ocpus     = 4
+control_plane_memory_gb = 24

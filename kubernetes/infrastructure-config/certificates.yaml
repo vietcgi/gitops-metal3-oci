@@ -1,0 +1,17 @@
+---
+# Wildcard TLS Certificate for *.qualityspace.com
+# One cert covers all subdomains, avoids per-domain rate limits
+# Requires: cert-manager CRDs and ClusterIssuer to be ready
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: wildcard-qualityspace-tls
+  namespace: ingress
+spec:
+  secretName: wildcard-qualityspace-tls
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  dnsNames:
+    - "*.qualityspace.com"
+    - "qualityspace.com"

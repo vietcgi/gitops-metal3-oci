@@ -5,21 +5,8 @@ kind: Namespace
 metadata:
   name: ingress
 ---
-# Wildcard TLS Certificate for *.qualityspace.com
-# One cert covers all subdomains, avoids per-domain rate limits
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: wildcard-qualityspace-tls
-  namespace: ingress
-spec:
-  secretName: wildcard-qualityspace-tls
-  issuerRef:
-    name: letsencrypt-prod
-    kind: ClusterIssuer
-  dnsNames:
-    - "*.qualityspace.com"
-    - "qualityspace.com"
+# NOTE: Certificate moved to infrastructure-config layer (requires cert-manager CRDs)
+# See kubernetes/infrastructure-config/certificates.yaml
 ---
 # Shared Gateway for all services
 # Uses wildcard cert for all *.qualityspace.com subdomains

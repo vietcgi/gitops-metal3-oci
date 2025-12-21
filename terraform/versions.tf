@@ -26,10 +26,12 @@ terraform {
 
   # OCI Object Storage backend (native)
   backend "oci" {
-    bucket    = "metal3-oci-state"
-    namespace = "iddc1lpdwqeb"
-    region    = "us-ashburn-1"
-    key       = "terraform.tfstate"
+    bucket              = "metal3-oci-state"
+    namespace           = "iddc1lpdwqeb"
+    region              = "us-ashburn-1"
+    key                 = "terraform.tfstate"
+    auth                = "SecurityToken"
+    config_file_profile = "DEFAULT"
   }
 }
 
