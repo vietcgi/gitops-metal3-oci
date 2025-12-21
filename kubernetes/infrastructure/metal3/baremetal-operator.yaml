@@ -417,6 +417,13 @@ rules:
       - metal3.io
     resources:
       - baremetalhosts
+      - bmceventsubscriptions
+      - dataimages
+      - firmwareschemas
+      - hardwaredata
+      - hostfirmwarecomponents
+      - hostfirmwaresettings
+      - preprovisioningimages
     verbs:
       - create
       - delete
@@ -429,16 +436,82 @@ rules:
       - metal3.io
     resources:
       - baremetalhosts/finalizers
+      - bmceventsubscriptions/finalizers
+      - dataimages/finalizers
+      - hostfirmwarecomponents/finalizers
+      - hostfirmwaresettings/finalizers
+      - preprovisioningimages/finalizers
     verbs:
       - update
   - apiGroups:
       - metal3.io
     resources:
       - baremetalhosts/status
+      - bmceventsubscriptions/status
+      - dataimages/status
+      - firmwareschemas/status
+      - hardwaredata/status
+      - hostfirmwarecomponents/status
+      - hostfirmwaresettings/status
+      - preprovisioningimages/status
     verbs:
       - get
       - patch
       - update
+---
+# Leader Election Role - namespace scoped for leases and configmaps
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: baremetal-operator-leader-election-role
+  namespace: baremetal-operator-system
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+---
+# Leader Election RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: baremetal-operator-leader-election-rolebinding
+  namespace: baremetal-operator-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: baremetal-operator-leader-election-role
+subjects:
+  - kind: ServiceAccount
+    name: baremetal-operator-controller-manager
+    namespace: baremetal-operator-system
 ---
 # ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
@@ -476,15 +549,18 @@ spec:
       serviceAccountName: baremetal-operator-controller-manager
       securityContext:
         runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
         seccompProfile:
           type: RuntimeDefault
       containers:
         - name: manager
-          image: registry.local-registry.svc.cluster.local:5000/metal3-io/baremetal-operator:arm64
+          image: localhost:30500/metal3-io/baremetal-operator:arm64
           imagePullPolicy: IfNotPresent
           args:
             - --metrics-addr=127.0.0.1:8085
             - --enable-leader-election
+            - --webhook-port=0
           env:
             - name: POD_NAMESPACE
               valueFrom:
@@ -509,16 +585,19 @@ spec:
             - containerPort: 8085
               name: metrics
               protocol: TCP
+            - containerPort: 9440
+              name: health
+              protocol: TCP
           livenessProbe:
             httpGet:
               path: /healthz
-              port: 8081
+              port: 9440
             initialDelaySeconds: 15
             periodSeconds: 20
           readinessProbe:
             httpGet:
               path: /readyz
-              port: 8081
+              port: 9440
             initialDelaySeconds: 5
             periodSeconds: 10
           resources:

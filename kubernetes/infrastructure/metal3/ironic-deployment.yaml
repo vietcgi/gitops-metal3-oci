@@ -15,10 +15,7 @@ spec:
       port: 6385
       targetPort: 6385
       protocol: TCP
-    - name: inspector
-      port: 5050
-      targetPort: 5050
-      protocol: TCP
+    # NOTE: inspector port removed - integrated into main ironic container
     - name: httpd
       port: 6180
       targetPort: 6180
@@ -58,7 +55,7 @@ spec:
       initContainers:
         # Download IPA images
         - name: ironic-ipa-downloader
-          image: registry.local-registry.svc.cluster.local:5000/metal3-io/ironic-ipa-downloader:arm64
+          image: localhost:30500/metal3-io/ironic-ipa-downloader:arm64
           imagePullPolicy: IfNotPresent
           securityContext:
             runAsUser: 997
@@ -77,8 +74,9 @@ spec:
       containers:
         # Ironic API and Conductor
         - name: ironic
-          image: registry.local-registry.svc.cluster.local:5000/metal3-io/ironic:arm64
+          image: localhost:30500/metal3-io/ironic:arm64
           imagePullPolicy: IfNotPresent
+          command: ["/bin/runironic"]
           securityContext:
             runAsUser: 997
             runAsGroup: 994
@@ -118,45 +116,12 @@ spec:
               memory: 1Gi
               cpu: 500m
 
-        # Ironic Inspector
-        - name: ironic-inspector
-          image: registry.local-registry.svc.cluster.local:5000/metal3-io/ironic:arm64
-          imagePullPolicy: IfNotPresent
-          command: ["/bin/runironic-inspector"]
-          securityContext:
-            runAsUser: 997
-            runAsGroup: 994
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
-          ports:
-            - containerPort: 5050
-              name: inspector
-              protocol: TCP
-          envFrom:
-            - configMapRef:
-                name: ironic-bmo-configmap
-          volumeMounts:
-            - name: shared
-              mountPath: /shared
-          livenessProbe:
-            httpGet:
-              path: /v1
-              port: 5050
-            initialDelaySeconds: 30
-            periodSeconds: 30
-          resources:
-            limits:
-              memory: 1Gi
-              cpu: "1"
-            requests:
-              memory: 512Mi
-              cpu: 250m
+        # NOTE: ironic-inspector is now integrated into the main ironic container
+        # in the ARM64 images built from PR #826
 
         # HTTP server for images
         - name: ironic-httpd
-          image: registry.local-registry.svc.cluster.local:5000/metal3-io/ironic:arm64
+          image: localhost:30500/metal3-io/ironic:arm64
           imagePullPolicy: IfNotPresent
           command: ["/bin/runhttpd"]
           securityContext:
@@ -177,8 +142,7 @@ spec:
             - name: shared
               mountPath: /shared
           livenessProbe:
-            httpGet:
-              path: /
+            tcpSocket:
               port: 6180
             initialDelaySeconds: 10
             periodSeconds: 30
@@ -192,7 +156,7 @@ spec:
 
         # Log watcher
         - name: ironic-log-watch
-          image: registry.local-registry.svc.cluster.local:5000/metal3-io/ironic:arm64
+          image: localhost:30500/metal3-io/ironic:arm64
           imagePullPolicy: IfNotPresent
           command: ["/bin/runlogwatch.sh"]
           securityContext:
