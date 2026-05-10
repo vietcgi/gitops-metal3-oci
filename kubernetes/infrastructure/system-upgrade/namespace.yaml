@@ -1,9 +1,0 @@
----
-# Namespace for Rancher's system-upgrade-controller and k3s upgrade Plans.
-# SUC drains/cordons the node, swaps the k3s binary, and reboots the agent.
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: system-upgrade
-  labels:
-    pod-security.kubernetes.io/enforce: privileged

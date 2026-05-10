@@ -1,8 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - namespace.yaml
-  - release.yaml
-  # NOTE: plans/k3s-server.yaml is intentionally NOT in this kustomization.
-  # The Plan CRD is installed by the SUC Helm chart, so the Plan must be
-  # applied in a separate phase. Commit it once SUC is healthy on cluster.
+  # Upstream Rancher SUC: includes Namespace + ServiceAccount + RBAC + Deployment
+  # Source: https://github.com/rancher/system-upgrade-controller/releases/latest
+  - upstream/crd.yaml
+  - upstream/controller.yaml
+  # NOTE: plans/k3s-server.yaml is NOT in this kustomization. The Plan CRD is
+  # in upstream/crd.yaml so it's available, BUT we leave the Plan out of the
+  # automated Flux sync so it can be applied deliberately when ready
+  # (k3s upgrade is a node-restart event).
