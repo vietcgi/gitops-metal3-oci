@@ -23,6 +23,10 @@ kubeconfig
 # Secrets (never commit!)
 *.pem
 *.key
+# Sealed secrets are encrypted; safe to commit
+!*-sealed.yaml
+!*sealed*.yaml
+
 *secret*
 !kubernetes/infrastructure/sealed-secrets/
 credentials*
