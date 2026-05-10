@@ -1,0 +1,35 @@
+---
+# k3s server upgrade Plan.
+# Pulls latest stable v1.34 release from the upstream channel server.
+# SUC drains the node, swaps the k3s binary, restarts, uncordons.
+# Single-node cluster: ~2-4 minutes of API downtime during the swap.
+apiVersion: upgrade.cattle.io/v1
+kind: Plan
+metadata:
+  name: k3s-server
+  namespace: system-upgrade
+  labels:
+    k3s-upgrade: server
+spec:
+  # Channel resolves to the latest patch in the v1.34 line
+  channel: https://update.k3s.io/v1-release/channels/v1.34
+  serviceAccountName: system-upgrade
+  concurrency: 1
+  cordon: true
+  drain:
+    force: true
+    skipWaitForDeleteTimeout: 60
+    ignoreDaemonSets: true
+    deleteEmptydirData: true
+  nodeSelector:
+    matchExpressions:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+  tolerations:
+    - key: "node-role.kubernetes.io/control-plane"
+      operator: "Exists"
+      effect: "NoSchedule"
+    - key: "CriticalAddonsOnly"
+      operator: "Exists"
+  upgrade:
+    image: rancher/k3s-upgrade

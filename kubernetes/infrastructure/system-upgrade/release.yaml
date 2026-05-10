@@ -1,0 +1,48 @@
+---
+# Rancher's system-upgrade-controller (SUC).
+# Apply Plans (see plans/) and SUC will execute them safely (drain, upgrade, uncordon).
+# Reference: https://github.com/rancher/system-upgrade-controller
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: system-upgrade-controller
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://rancher.github.io/system-upgrade-controller
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: system-upgrade-controller
+  namespace: system-upgrade
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: system-upgrade-controller
+      version: "0.16.x"
+      sourceRef:
+        kind: HelmRepository
+        name: system-upgrade-controller
+        namespace: flux-system
+  values:
+    # SUC needs node host access to swap the k3s binary
+    rbac:
+      create: true
+    serviceAccount:
+      create: true
+      name: system-upgrade
+    # Required by Plans that touch host filesystem
+    securityContext:
+      runAsNonRoot: false
+    podSecurityContext:
+      runAsNonRoot: false
+    nodeSelector:
+      kubernetes.io/os: linux
+    tolerations:
+      - key: "node-role.kubernetes.io/control-plane"
+        operator: "Exists"
+        effect: "NoSchedule"
+      - key: "CriticalAddonsOnly"
+        operator: "Exists"

@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - release.yaml
+  # NOTE: plans/k3s-server.yaml is intentionally NOT in this kustomization.
+  # The Plan CRD is installed by the SUC Helm chart, so the Plan must be
+  # applied in a separate phase. Commit it once SUC is healthy on cluster.

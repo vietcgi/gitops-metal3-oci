@@ -24,3 +24,5 @@ resources:
   # Bare metal provisioning (Metal3/Ironic)
   # Using ARM64 images built from PR #826 (https://github.com/metal3-io/ironic-image/pull/826)
   - metal3
+  # k3s upgrade controller (Rancher SUC) — drives in-place k3s upgrades via Plans
+  - system-upgrade
