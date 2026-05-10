@@ -21,6 +21,10 @@ spec:
     skipWaitForDeleteTimeout: 60
     ignoreDaemonSets: true
     deleteEmptydirData: true
+    # Single-node cluster: PodDisruptionBudgets (e.g. Gatekeeper, cilium-operator)
+    # require minAvailable ≥ 1, which can't be satisfied with one node. Bypass
+    # the eviction API and force-delete instead.
+    disableEviction: true
   nodeSelector:
     matchExpressions:
       - key: node-role.kubernetes.io/control-plane
