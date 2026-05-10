@@ -23,7 +23,7 @@ spec:
   chart:
     spec:
       chart: kube-prometheus-stack
-      version: "72.6.2"  # Nov 2025 - stable
+      version: "75.18.0"  # Nov 2025 - stable
       sourceRef:
         kind: HelmRepository
         name: prometheus-community

@@ -13,7 +13,7 @@ spec:
   chart:
     spec:
       chart: vm-single
-      version: "0.7.3"
+      version: "0.8.64"
       sourceRef:
         kind: HelmRepository
         name: vm
