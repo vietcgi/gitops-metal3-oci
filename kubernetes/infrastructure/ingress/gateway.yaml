@@ -39,3 +39,40 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: wildcard-qualityspace-tls
+    # baohiemxe.com listeners (Cloudflare Origin CA cert)
+    - name: http-baohiemxe
+      protocol: HTTP
+      port: 80
+      hostname: baohiemxe.com
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: http-baohiemxe-www
+      protocol: HTTP
+      port: 80
+      hostname: www.baohiemxe.com
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-baohiemxe
+      protocol: HTTPS
+      port: 443
+      hostname: baohiemxe.com
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: baohiemxe-com-tls
+    - name: https-baohiemxe-www
+      protocol: HTTPS
+      port: 443
+      hostname: www.baohiemxe.com
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: baohiemxe-com-tls

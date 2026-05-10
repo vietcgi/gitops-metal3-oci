@@ -1,0 +1,16 @@
+# Allows the main-gateway (in ingress namespace) to forward traffic to
+# the baohiemxe Service in the baohiemxe namespace.
+# Required by Gateway API spec when crossing namespaces.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: ingress-to-baohiemxe
+  namespace: baohiemxe
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: ingress
+  to:
+    - group: ""
+      kind: Service
