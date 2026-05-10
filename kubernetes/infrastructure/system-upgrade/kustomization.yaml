@@ -5,7 +5,5 @@ resources:
   # Source: https://github.com/rancher/system-upgrade-controller/releases/latest
   - upstream/crd.yaml
   - upstream/controller.yaml
-  # NOTE: plans/k3s-server.yaml is NOT in this kustomization. The Plan CRD is
-  # in upstream/crd.yaml so it's available, BUT we leave the Plan out of the
-  # automated Flux sync so it can be applied deliberately when ready
-  # (k3s upgrade is a node-restart event).
+  # k3s upgrade Plan — SUC processes this and rolls the node to v1.34.
+  - plans/k3s-server.yaml
