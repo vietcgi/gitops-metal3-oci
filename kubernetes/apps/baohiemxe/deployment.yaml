@@ -33,7 +33,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: 158.101.99.38:30500/baohiemxe:latest
+          image: 158.101.99.38:30500/baohiemxe:7a941d4-20260510-143852-supabase
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -48,6 +48,11 @@ spec:
               value: 0.0.0.0
             - name: NEXT_PUBLIC_SITE_URL
               value: https://baohiemxe.com
+            # Supabase (Postgres in us-east-1; DATABASE_URL is in baohiemxe-secrets)
+            - name: NEXT_PUBLIC_SUPABASE_URL
+              value: https://riavvtbpneyueewfcwmt.supabase.co
+            - name: NEXT_PUBLIC_SUPABASE_ANON_KEY
+              value: sb_publishable_GwYk012sKyjGY2xR4rXtfg_72pehNRS
             # Resend SMTP (transactional email; lead notifications + auto-replies)
             - name: SMTP_HOST
               value: smtp.resend.com
