@@ -9,7 +9,7 @@ spec:
   chart:
     spec:
       chart: cilium
-      version: "1.18.4"  # Latest stable (Nov 2025)
+      version: "1.18.9"  # Latest stable (Nov 2025)
       sourceRef:
         kind: HelmRepository
         name: cilium

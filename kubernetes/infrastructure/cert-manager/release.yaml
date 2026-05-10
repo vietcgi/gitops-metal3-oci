@@ -14,7 +14,7 @@ spec:
   chart:
     spec:
       chart: cert-manager
-      version: "1.19.1"  # Latest stable (Nov 2025)
+      version: "1.20.2"  # Latest stable (Nov 2025)
       sourceRef:
         kind: HelmRepository
         name: jetstack
