@@ -7,3 +7,4 @@ resources:
   - service.yaml
   - reference-grant.yaml
   - httproute.yaml
+  - secrets-sealed.yaml
