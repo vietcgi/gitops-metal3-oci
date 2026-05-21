@@ -1,6 +1,7 @@
 ---
 # Let's Encrypt Production ClusterIssuer
-# Uses HTTP-01 challenge via Cilium Gateway API
+# DNS-01 (Cloudflare) handles wildcard certs and non-public origins;
+# HTTP-01 (Gateway) handles per-host certs.
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -12,6 +13,18 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-prod-account-key
     solvers:
+      # DNS-01 required for wildcard certs. Uses the cloudflare-api-token secret
+      # already provisioned in cert-manager namespace.
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
+        selector:
+          dnsZones:
+            - "qualityspace.com"
+            - "baohiemxe.com"
+      # HTTP-01 fallback for non-wildcard, single-host certs.
       - http01:
           gatewayHTTPRoute:
             parentRefs:
@@ -31,6 +44,15 @@ spec:
     privateKeySecretRef:
       name: letsencrypt-staging-account-key
     solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
+        selector:
+          dnsZones:
+            - "qualityspace.com"
+            - "baohiemxe.com"
       - http01:
           gatewayHTTPRoute:
             parentRefs:
