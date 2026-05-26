@@ -33,7 +33,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: web
-          image: 158.101.99.38:30500/baohiemxe:27b092f-20260526-130034
+          image: 158.101.99.38:30500/baohiemxe:fd8b47d-20260526-131903
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
