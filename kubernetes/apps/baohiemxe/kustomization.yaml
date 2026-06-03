@@ -8,3 +8,4 @@ resources:
   - reference-grant.yaml
   - httproute.yaml
   - secrets-sealed.yaml
+  - keepalive-cronjob.yaml

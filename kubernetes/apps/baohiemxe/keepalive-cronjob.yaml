@@ -1,0 +1,73 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: baohiemxe-db-keepalive
+  labels:
+    app.kubernetes.io/name: baohiemxe
+    app.kubernetes.io/component: db-keepalive
+spec:
+  # Daily at 11:30 UTC (~04:30 America/Los_Angeles, off-peak). The Supabase free
+  # tier auto-pauses after ~7 days of inactivity; a daily query keeps the lead
+  # database awake with a ~6-day safety margin even if a couple of runs fail.
+  schedule: "30 11 * * *"
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 120
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: baohiemxe
+            app.kubernetes.io/component: db-keepalive
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: keepalive
+              image: postgres:17-alpine
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-c"]
+              # ON_ERROR_STOP makes psql exit non-zero on any failure so the Job
+              # is marked failed (and retried) instead of silently "succeeding".
+              args:
+                - psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -tAc "select now()"
+              env:
+                - name: DATABASE_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: baohiemxe-secrets
+                      key: DATABASE_URL
+                - name: PGSSLMODE
+                  value: require
+                - name: PGCONNECT_TIMEOUT
+                  value: "10"
+                - name: HOME
+                  value: /tmp
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              resources:
+                requests:
+                  cpu: 10m
+                  memory: 32Mi
+                limits:
+                  cpu: 100m
+                  memory: 64Mi
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
