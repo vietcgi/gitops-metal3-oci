@@ -1,0 +1,73 @@
+---
+# External uptime probe + targeted alert rules.
+#
+# These are Prometheus Operator CRs (Probe, PrometheusRule) whose CRDs ship with
+# kube-prometheus-stack in Layer 1 (infrastructure). They live here in Layer 2
+# (infrastructure-config) so Flux applies them only after those CRDs exist.
+#
+# The `release: kube-prometheus-stack` label is REQUIRED: the Prometheus CR's
+# probeSelector/ruleSelector match exactly that label. Without it these objects
+# apply cleanly but Prometheus silently ignores them.
+apiVersion: monitoring.coreos.com/v1
+kind: Probe
+metadata:
+  name: external-sites
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  jobName: blackbox-external
+  interval: 60s
+  module: http_2xx
+  prober:
+    url: blackbox-exporter-prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
+  targets:
+    staticConfig:
+      static:
+        - https://baohiemxe.com
+        - https://qualityspace.com
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: site-and-node-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: external-uptime
+      rules:
+        # Catches what internal metrics cannot see: Cloudflare, DNS, TLS, the
+        # whole external path to the site. Fires off the blackbox Probe above.
+        - alert: SiteDown
+          expr: probe_success == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Site down: {{ $labels.instance }}"
+            description: "External blackbox probe to {{ $labels.instance }} has been failing for >2m (probe_success=0)."
+        # TLS cert expiry warning (cert renews via cert-manager, but this is the
+        # external view of what the world actually receives).
+        - alert: SiteCertExpiringSoon
+          expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 10
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "TLS cert expiring soon: {{ $labels.instance }}"
+            description: "The TLS certificate served at {{ $labels.instance }} expires in less than 10 days."
+    - name: node-health
+      rules:
+        # The exact failure that caused the 2026-06-26 outage: k3s auto-upgrade
+        # left the single node cordoned (SchedulingDisabled). On a single-node
+        # cluster a cordon means pods cannot schedule = total outage.
+        - alert: NodeCordoned
+          expr: kube_node_spec_unschedulable == 1
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Node cordoned: {{ $labels.node }}"
+            description: "Node {{ $labels.node }} has been unschedulable (cordoned) for >10m. On this single-node cluster that prevents all pod scheduling. Fix: kubectl uncordon {{ $labels.node }}"

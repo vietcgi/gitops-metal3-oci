@@ -1,0 +1,115 @@
+---
+# alertmanager-ntfy: a ~10MB Go bridge that turns Alertmanager webhooks into
+# clean ntfy push notifications (severity -> priority, readable title/body).
+#
+# Alertmanager (kube-prometheus-stack) POSTs to this Service's /hook endpoint;
+# the bridge publishes to a ntfy.sh topic that the phone app is subscribed to.
+#
+# Topic is a long random string used as obscurity only (ntfy.sh public topics
+# are readable by anyone who knows the name). Harden later with ntfy access
+# tokens or a self-hosted ntfy, at which point move this config to a SealedSecret.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager-ntfy
+  namespace: monitoring
+data:
+  config.yml: |
+    http:
+      addr: :8000
+    ntfy:
+      baseurl: https://ntfy.sh
+      notification:
+        topic: baohiemxe-alerts-93895100f658
+        priority: |
+          status == "firing" ? "high" : "default"
+        tags:
+          - tag: rotating_light
+            condition: status == "firing"
+          - tag: white_check_mark
+            condition: status == "resolved"
+        templates:
+          title: |
+            {{ if eq .Status "resolved" }}Resolved: {{ end }}{{ if .Annotations.summary }}{{ .Annotations.summary }}{{ else }}{{ .Labels.alertname }}{{ end }}
+          description: |
+            {{ if .Annotations.description }}{{ .Annotations.description }}{{ else }}{{ .Labels.alertname }} ({{ .Labels.severity }}) in {{ .Labels.namespace }}{{ end }}
+          headers:
+            X-Click: |
+              {{ .GeneratorURL }}
+      async: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alertmanager-ntfy
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager-ntfy
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager-ntfy
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: alertmanager-ntfy
+      annotations:
+        # Roll the pod when the config changes (ConfigMap edits don't restart pods on their own).
+        checksum/config: "baohiemxe-alerts-93895100f658-v1"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: bridge
+          image: ghcr.io/alexbakker/alertmanager-ntfy:1.2.1
+          args:
+            - "--configs"
+            - "/config/config.yml"
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 5m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+      volumes:
+        - name: config
+          configMap:
+            name: alertmanager-ntfy
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager-ntfy
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager-ntfy
+spec:
+  selector:
+    app.kubernetes.io/name: alertmanager-ntfy
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+      protocol: TCP

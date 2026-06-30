@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - release.yaml
   - blackbox-exporter.yaml
+  - alertmanager-ntfy.yaml
   - loki.yaml
   - tempo.yaml
   - jaeger.yaml
