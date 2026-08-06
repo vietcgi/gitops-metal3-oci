@@ -1,26 +1,26 @@
 terraform {
-  required_version = ">= 1.5.0"
+  required_version = ">= 1.14.0, < 2.0.0"
 
   required_providers {
     oci = {
       source  = "oracle/oci"
-      version = ">= 5.0.0"
+      version = "~> 8.13"
     }
     cloudinit = {
       source  = "hashicorp/cloudinit"
-      version = ">= 2.3.0"
+      version = "~> 2.3"
     }
     tls = {
       source  = "hashicorp/tls"
-      version = ">= 4.0.0"
+      version = "~> 4.2"
     }
     local = {
       source  = "hashicorp/local"
-      version = ">= 2.4.0"
+      version = "~> 2.8"
     }
     random = {
       source  = "hashicorp/random"
-      version = ">= 3.0.0"
+      version = "~> 3.8"
     }
   }
 
