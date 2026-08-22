@@ -36,6 +36,16 @@ spec:
         - path:
             type: PathPrefix
             value: /
+      filters:
+        # Which origin served this response. baohiemxe.com now has two proxied
+        # A records, so without this you cannot tell which cluster answered,
+        # and you cannot confirm failover actually happened during an incident.
+        # Cheap, safe, and does not affect caching.
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Served-By
+                value: east
       backendRefs:
         - name: baohiemxe
           port: 80
