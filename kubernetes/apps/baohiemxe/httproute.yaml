@@ -19,9 +19,18 @@ spec:
     - name: main-gateway
       namespace: ingress
       sectionName: http-baohiemxe-www
+    - name: main-gateway
+      namespace: ingress
+      sectionName: https-baohiemxe-origin-east
+    - name: main-gateway
+      namespace: ingress
+      sectionName: http-baohiemxe-origin-east
   hostnames:
     - baohiemxe.com
     - www.baohiemxe.com
+    # Direct name for this origin, used by the edge Worker that picks between
+    # origins. Serves identical content; never advertised publicly.
+    - origin-east.baohiemxe.com
   rules:
     - matches:
         - path:

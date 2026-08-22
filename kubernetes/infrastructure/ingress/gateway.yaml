@@ -76,3 +76,28 @@ spec:
         mode: Terminate
         certificateRefs:
           - name: baohiemxe-com-tls
+    # origin-east.baohiemxe.com: a directly addressable name for THIS origin.
+    #
+    # baohiemxe.com itself will be fronted by a Worker that picks between
+    # origins, and a Worker cannot fetch the same hostname it serves. So each
+    # origin needs its own hostname. Proxied (orange) in DNS, so the origin IP
+    # stays hidden. Covered by the existing *.baohiemxe.com Origin CA cert, so
+    # no new certificate is required.
+    - name: http-baohiemxe-origin-east
+      protocol: HTTP
+      port: 80
+      hostname: origin-east.baohiemxe.com
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: https-baohiemxe-origin-east
+      protocol: HTTPS
+      port: 443
+      hostname: origin-east.baohiemxe.com
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: baohiemxe-com-tls
