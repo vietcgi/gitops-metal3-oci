@@ -1,0 +1,51 @@
+# East origin for vuabaohiem.com.
+#
+# NOTE THE HOSTNAME: it lives in the qualityspace.com zone, not vuabaohiem.com.
+# That is deliberate, not a mistake. The Cloudflare dashboard's add-record modal
+# is broken on the vuabaohiem.com zone (it opens but never finishes rendering),
+# so origin-east.vuabaohiem.com could not be created. Addressing this origin
+# from a zone we can edit also means it is covered by the existing
+# *.qualityspace.com wildcard listener and certificate, which removes the need
+# for a new gateway listener AND for ACME issuance on this cluster entirely.
+#
+# This is safe only because the app never derives URLs from the request Host:
+# nothing reads headers().get("host"), and lib/agency.ts pins baseUrl to
+# https://vuabaohiem.com. Verified 2026-08-22. If that ever changes, this
+# hostname must change too, or vuabaohiem will emit qualityspace URLs.
+#
+# THE COUPLING: vuabaohiem's failover now depends on a DNS record in the
+# qualityspace.com zone. Deleting vbh-origin-east.qualityspace.com silently
+# removes vuabaohiem's second origin.
+#
+# Serves this hostname only. The apex is deliberately absent so east can never
+# answer public traffic on its own, and so it never serves /admin or /api,
+# which the edge Worker pins to west because vuabaohiem has no shared database.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: vuabaohiem-origin-east
+  namespace: vuabaohiem
+spec:
+  parentRefs:
+    - name: main-gateway
+      namespace: ingress
+      sectionName: https
+    - name: main-gateway
+      namespace: ingress
+      sectionName: http
+  hostnames:
+    - vbh-origin-east.qualityspace.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Served-By
+                value: east
+      backendRefs:
+        - name: vuabaohiem-web
+          port: 80

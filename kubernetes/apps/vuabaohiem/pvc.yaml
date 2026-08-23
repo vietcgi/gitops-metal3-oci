@@ -1,0 +1,23 @@
+# East's copy of the lead volume.
+#
+# It should stay EMPTY in normal operation: the edge Worker pins every write
+# and every /admin read to the west origin precisely so lead data never splits
+# across two disks. This exists only because the Deployment mounts /data and
+# the pod will not start without it.
+#
+# If anything ever does land here, it means west was unreachable and the lead
+# was written where nobody looks. Check this volume after any west outage.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vuabaohiem-leads-data
+  namespace: vuabaohiem
+  labels:
+    app.kubernetes.io/name: vuabaohiem-web
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi

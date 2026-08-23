@@ -1,0 +1,14 @@
+# East origin for vuabaohiem.com. Read-only in practice: the edge Worker pins
+# all writes and all /admin reads to west, because vuabaohiem has no database
+# and its lead JSONL file is the system of record.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - secret-leads-sealed.yaml
+  - secret-admin-sealed.yaml
+  - pvc.yaml
+  - deployment.yaml
+  - service.yaml
+  - reference-grant.yaml
+  - httproute.yaml
