@@ -1,0 +1,16 @@
+# East origin for qualityspace.com.
+#
+# Deliberately does NOT include review-cron-cronjob.yaml: the review sync
+# writes a snapshot and must run in exactly one cluster (west), or the two
+# clusters race each other and double-write.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: qualityspace
+resources:
+  - namespace.yaml
+  - secret-leads-sealed.yaml
+  - secret-admin-sealed.yaml
+  - deployment.yaml
+  - service.yaml
+  - reference-grant.yaml
+  - httproute.yaml

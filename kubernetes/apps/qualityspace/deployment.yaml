@@ -1,0 +1,133 @@
+# EAST origin for qualityspace.com.
+#
+# Byte-for-byte the same app as the west origin and MUST stay on the same image
+# tag: the Cloudflare Worker can send any request to either cluster, and Next.js
+# serves build-hashed /_next/static assets from inside the image. If the two
+# origins drift, HTML fetched from one can reference a chunk the other does not
+# have. `make deploy` bumps both gitops repos atomically for this reason.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qualityspace-web
+  namespace: qualityspace
+  labels:
+    app.kubernetes.io/name: qualityspace-web
+    app.kubernetes.io/part-of: qualityspace-site
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: qualityspace-web
+  template:
+    metadata:
+      labels:
+        app: qualityspace-web
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          # Image updated by deploy/build-push.sh + this YAML at every release.
+          # Format: ghcr.io/vietcgi/qualityspace:<short-sha>-<UTC-yymmdd-hhmm>
+          image: ghcr.io/vietcgi/qualityspace:81a1783-20260822-2359
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: NEXT_TELEMETRY_DISABLED
+              value: "1"
+            - name: HOSTNAME
+              value: "0.0.0.0"
+            - name: PORT
+              value: "3000"
+            # Lead pipeline JSONL fallback path. readOnlyRootFilesystem is true,
+            # so it must write to a mounted writable volume; /tmp is an emptyDir.
+            # Ignored once DATABASE_URL is present in the qualityspace-leads secret
+            # (then leads write to Postgres instead).
+            - name: QUALITYSPACE_DATA_DIR
+              value: "/tmp/leads"
+            # Admin Basic Auth credentials for /admin/* (middleware.ts).
+            # Secret created out-of-band via kubectl on the cluster:
+            #   kubectl -n qualityspace create secret generic qualityspace-admin-auth \
+            #     --from-literal=ADMIN_USERNAME='kevin' \
+            #     --from-literal=ADMIN_PASSWORD='<strong password>'
+            # If the secret is missing, the middleware fails closed and /admin
+            # returns 401 for all requests (secure default).
+            - name: ADMIN_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: qualityspace-admin-auth
+                  key: ADMIN_USERNAME
+                  optional: true
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: qualityspace-admin-auth
+                  key: ADMIN_PASSWORD
+                  optional: true
+          # Lead-notify pipeline: SMTP_* + LEAD_* (Resend). The secret is created
+          # out-of-band on the cluster and kept OUT of this PUBLIC repo:
+          #   grep -E '^(SMTP_|LEAD_)' .env.local | ssh <node> \
+          #     "kubectl -n qualityspace create secret generic qualityspace-leads \
+          #        --from-env-file=/dev/stdin --dry-run=client -o yaml | kubectl apply -f -"
+          # Add DATABASE_URL to the same secret to switch from JSONL to Postgres.
+          # optional:true => pod still starts if the secret is absent (email no-ops).
+          envFrom:
+            - secretRef:
+                name: qualityspace-leads
+                optional: true
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: nextjs-cache
+              mountPath: /app/.next/cache
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: nextjs-cache
+          emptyDir: {}

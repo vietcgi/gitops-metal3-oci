@@ -1,0 +1,42 @@
+# East origin for qualityspace.com.
+#
+# This route deliberately serves ONLY origin-east.qualityspace.com, not the
+# apex. Public traffic reaches the apex through a Cloudflare Worker, which
+# picks an origin and fetches it by its direct name. Keeping the apex off this
+# route means east can never accidentally answer public traffic on its own if
+# DNS is ever pointed here by mistake.
+#
+# The hostname is covered by the existing "*.qualityspace.com" wildcard
+# listener and its wildcard-qualityspace-tls cert, so no new listener or
+# certificate is needed.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: qualityspace-origin-east
+  namespace: qualityspace
+spec:
+  parentRefs:
+    - name: main-gateway
+      namespace: ingress
+      sectionName: https
+    - name: main-gateway
+      namespace: ingress
+      sectionName: http
+  hostnames:
+    - origin-east.qualityspace.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        # Which origin answered. Without this you cannot confirm during an
+        # incident whether failover actually moved traffic.
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Served-By
+                value: east
+      backendRefs:
+        - name: qualityspace-web
+          port: 80

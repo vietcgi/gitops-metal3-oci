@@ -1,0 +1,16 @@
+# Allows the main-gateway (in the ingress namespace) to forward traffic to the
+# qualityspace-web Service in this namespace. Required by the Gateway API spec
+# when an HTTPRoute crosses namespaces.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: ingress-to-qualityspace
+  namespace: qualityspace
+spec:
+  from:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      namespace: ingress
+  to:
+    - group: ""
+      kind: Service
