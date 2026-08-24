@@ -8,6 +8,7 @@ kind: Kustomization
 namespace: qualityspace
 resources:
   - namespace.yaml
+  - pvc.yaml
   - secret-leads-sealed.yaml
   - secret-admin-sealed.yaml
   - deployment.yaml
