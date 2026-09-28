@@ -26,6 +26,16 @@ spec:
       static:
         - https://baohiemxe.com
         - https://qualityspace.com
+        # Per-origin health URLs bypass the Cloudflare HTML cache (no-store), so a
+        # dead origin alerts even while the apex still serves cached pages.
+        # 2026-09-28: a 2h qualityspace outage (OOMKilled pods) was invisible to
+        # the apex-only probe because the edge kept returning cached 200s.
+        - https://origin-east.qualityspace.com/?__health=uptime
+        - https://origin-west.qualityspace.com/?__health=uptime
+        - https://origin-east.baohiemxe.com/?__health=uptime
+        - https://origin-west.baohiemxe.com/?__health=uptime
+        - https://vbh-origin-east.qualityspace.com/?__health=uptime
+        - https://origin-west.vuabaohiem.com/?__health=uptime
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
