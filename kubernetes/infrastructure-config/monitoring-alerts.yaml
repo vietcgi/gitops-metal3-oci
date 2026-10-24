@@ -17,7 +17,10 @@ metadata:
     release: kube-prometheus-stack
 spec:
   jobName: blackbox-external
-  interval: 60s
+  # 3m, not 60s: every probe is a Cloudflare Worker invocation and the free
+  # plan's 100k/day is shared by all three sites. At 60s these 8 targets used
+  # ~12-20k/day and helped push the account over quota on 2026-10-23.
+  interval: 3m
   module: http_2xx
   prober:
     url: blackbox-exporter-prometheus-blackbox-exporter.monitoring.svc.cluster.local:9115
@@ -52,12 +55,12 @@ spec:
         # whole external path to the site. Fires off the blackbox Probe above.
         - alert: SiteDown
           expr: probe_success == 0
-          for: 2m
+          for: 5m
           labels:
             severity: critical
           annotations:
             summary: "Site down: {{ $labels.instance }}"
-            description: "External blackbox probe to {{ $labels.instance }} has been failing for >2m (probe_success=0)."
+            description: "External blackbox probe to {{ $labels.instance }} has been failing for >5m (probe_success=0)."
         # TLS cert expiry warning (cert renews via cert-manager, but this is the
         # external view of what the world actually receives).
         - alert: SiteCertExpiringSoon
